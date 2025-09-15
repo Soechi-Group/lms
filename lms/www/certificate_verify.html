@@ -2,7 +2,7 @@
 <div class="container my-5">
 	{% if error %}
 	<div class="alert alert-danger text-center">{{ error }}</div>
-	{% else %}
+	{% elif certificate and iframe_url %}
 	<div class="text-center mb-4">
 		<h2>🎓 Certificate Verification</h2>
 		<p><strong>Certificate ID:</strong> {{ certificate_id }}</p>
@@ -14,7 +14,15 @@
 			width="100%"
 			height="100%"
 			frameborder="0"
+			type="application/pdf"
 		></iframe>
+	</div>
+	{% else %}
+	<div class="text-center mb-4">
+		<h2>🎓 Certificate Verification</h2>
+	</div>
+	<div class="alert alert-warning text-center">
+		❌ Certificate {{ certificate_id }} Not Found.
 	</div>
 	{% endif %}
 </div>
