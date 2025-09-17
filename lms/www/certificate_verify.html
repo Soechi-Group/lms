@@ -1,10 +1,10 @@
 {% extends "templates/web.html" %} {% block page_content %}
-<div class="container my-5">
+<div class="alert alert-warning container my-5">
 	{% if error %}
 	<div class="alert alert-danger text-center">{{ error }}</div>
 	{% elif certificate and iframe_url %}
 	<div class="text-center mb-4">
-		<h2>🎓 Certificate Verification</h2>
+		<h2 class="mt-5">🎓 Certificate Verification</h2>
 		<p><strong>Certificate ID:</strong> {{ certificate_id }}</p>
 	</div>
 
@@ -21,7 +21,7 @@
 	<div class="text-center mb-4">
 		<h2>🎓 Certificate Verification</h2>
 	</div>
-	<div class="alert alert-warning text-center">
+	<div class="text-center">
 		❌ Certificate {{ certificate_id }} Not Found.
 	</div>
 	{% endif %}
