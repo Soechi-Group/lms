@@ -73,7 +73,7 @@
 			>
 				{{
 					__(
-						'This site is being updated. You will not be able to make any changes. Full access will be restored shortly.'
+						'This site is being updated. You will not be able to make any changes. Full access will be restored shortly.',
 					)
 				}}
 			</div>
@@ -104,16 +104,14 @@
 					"
 				>
 					<Tooltip v-if="readOnlyMode && sidebarStore.isSidebarCollapsed">
-						<CircleAlert
-							class="size-4 stroke-1.5 text-white cursor-pointer"
-						/>
+						<CircleAlert class="size-4 stroke-1.5 text-white cursor-pointer" />
 						<template #body>
 							<div
 								class="max-w-[30ch] rounded bg-surface-gray-7 px-2 py-1 text-center text-p-xs text-ink-white shadow-xl"
 							>
 								{{
 									__(
-										'This site is being updated. You will not be able to make any changes. Full access will be restored shortly.'
+										'This site is being updated. You will not be able to make any changes. Full access will be restored shortly.',
 									)
 								}}
 							</div>
@@ -173,6 +171,7 @@ import {
 	markRaw,
 	h,
 	onUnmounted,
+	watchEffect,
 } from 'vue'
 import { getSidebarLinks } from '@/utils'
 import { usersStore } from '@/stores/user'
@@ -233,36 +232,30 @@ const iconProps = {
 	height: 16,
 }
 
-// Update sidebar menu based on learning paths setting
-const updateSidebarForLearningPaths = () => {
-	// Reset sidebarLinks to default
-	sidebarLinks.value = getSidebarLinks()
-	// Remove 'Courses' if learning paths enabled for student
-	if (!isInstructor.value && !isModerator.value && settingsStore.learningPaths.data) {
-		sidebarLinks.value = sidebarLinks.value.filter(
-			(link) => link.label !== 'Courses'
-		)
-		// Insert 'Programs' menu
-		sidebarLinks.value.splice(2, 0, {
-			label: 'Programs',
-			icon: 'Route',
-			to: 'Programs',
-			activeFor: ['Programs', 'ProgramForm'],
-		})
-	}
-}
-
 onMounted(() => {
 	addNotifications()
-	updateSidebarForLearningPaths()
-	// setUpOnboarding()
+	setSidebarLinks()
 	socket.on('publish_lms_notifications', (data) => {
 		unreadNotifications.reload()
 	})
 })
 
-
-// setSidebarLinks is now handled by updateSidebarForLearningPaths
+const setSidebarLinks = () => {
+	sidebarSettings.reload(
+		{},
+		{
+			onSuccess(data) {
+				Object.keys(data).forEach((key) => {
+					if (!parseInt(data[key])) {
+						sidebarLinks.value = sidebarLinks.value.filter(
+							(link) => link.label.toLowerCase().split(' ').join('_') !== key,
+						)
+					}
+				})
+			},
+		},
+	)
+}
 
 const unreadNotifications = createResource({
 	cache: 'Unread Notifications Count',
@@ -350,7 +343,6 @@ const addProgrammingExercises = () => {
 
 const addPrograms = () => {
 	let activeFor = ['Programs', 'ProgramForm']
-	let index = 2
 	let canAddProgram = false
 
 	if (
@@ -359,23 +351,41 @@ const addPrograms = () => {
 		settingsStore.learningPaths.data
 	) {
 		sidebarLinks.value = sidebarLinks.value.filter(
-			(link) => link.label !== 'Courses'
+			(link) => link.label !== 'Courses',
 		)
 		activeFor.push('CourseDetail')
 		activeFor.push('Lesson')
-		index = 0
 		canAddProgram = true
 	} else if (isInstructor.value || isModerator.value) {
 		canAddProgram = true
 	}
 
-	if (canAddProgram) {
-		sidebarLinks.value.splice(index, 0, {
-			label: 'Programs',
-			icon: 'Route',
-			to: 'Programs',
-			activeFor: activeFor,
-		})
+	if (
+		canAddProgram &&
+		!sidebarLinks.value.find((l) => l.label === 'Programs')
+	) {
+		// cari posisi Dashboard
+		const dashboardIndex = sidebarLinks.value.findIndex(
+			(l) => l.label === 'Dashboard',
+		)
+
+		// kalau ketemu, insert setelah Dashboard
+		if (dashboardIndex !== -1) {
+			sidebarLinks.value.splice(dashboardIndex + 1, 0, {
+				label: 'Programs',
+				icon: 'Route',
+				to: 'Programs',
+				activeFor: activeFor,
+			})
+		} else {
+			// fallback: kalau Dashboard nggak ada, push di awal
+			sidebarLinks.value.unshift({
+				label: 'Programs',
+				icon: 'Route',
+				to: 'Programs',
+				activeFor: activeFor,
+			})
+		}
 	}
 }
 
@@ -398,7 +408,7 @@ const deletePage = (link) => {
 			onSuccess() {
 				sidebarSettings.reload()
 			},
-		}
+		},
 	)
 }
 
@@ -406,7 +416,7 @@ const toggleSidebar = () => {
 	sidebarStore.isSidebarCollapsed = !sidebarStore.isSidebarCollapsed
 	localStorage.setItem(
 		'isSidebarCollapsed',
-		JSON.stringify(sidebarStore.isSidebarCollapsed)
+		JSON.stringify(sidebarStore.isSidebarCollapsed),
 	)
 }
 
@@ -414,7 +424,7 @@ const toggleWebPages = () => {
 	sidebarStore.isWebpagesCollapsed = !sidebarStore.isWebpagesCollapsed
 	localStorage.setItem(
 		'isWebpagesCollapsed',
-		JSON.stringify(sidebarStore.isWebpagesCollapsed)
+		JSON.stringify(sidebarStore.isWebpagesCollapsed),
 	)
 }
 
@@ -617,6 +627,26 @@ const articles = ref([
 	},
 ])
 
+const setupSidebarForUser = () => {
+	if (!userResource.data) return
+
+	isModerator.value = userResource.data.is_moderator
+	isInstructor.value = userResource.data.is_instructor
+
+	// Hanya tampilkan menu "Courses" untuk admin
+	if (!userResource.data.is_system_manager) {
+		sidebarLinks.value = sidebarLinks.value.filter(
+			(link) => link.label !== 'Courses',
+		)
+	}
+
+	addPrograms()
+	// addProgrammingExercises()
+	addQuizzes()
+	addAssignments()
+	// setUpOnboarding()
+}
+
 const setUpOnboarding = () => {
 	if (userResource.data?.is_system_manager) {
 		onboardingDetails = useOnboarding('learning')
@@ -626,14 +656,9 @@ const setUpOnboarding = () => {
 	}
 }
 
-watch([userResource, settingsStore.learningPaths], () => {
+watchEffect(() => {
 	if (userResource.data) {
-		isModerator.value = userResource.data.is_moderator
-		isInstructor.value = userResource.data.is_instructor
-		updateSidebarForLearningPaths()
-		addQuizzes()
-		addAssignments()
-		// setUpOnboarding()
+		setupSidebarForUser()
 	}
 })
 
