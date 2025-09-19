@@ -233,31 +233,36 @@ const iconProps = {
 	height: 16,
 }
 
+// Update sidebar menu based on learning paths setting
+const updateSidebarForLearningPaths = () => {
+	// Reset sidebarLinks to default
+	sidebarLinks.value = getSidebarLinks()
+	// Remove 'Courses' if learning paths enabled for student
+	if (!isInstructor.value && !isModerator.value && settingsStore.learningPaths.data) {
+		sidebarLinks.value = sidebarLinks.value.filter(
+			(link) => link.label !== 'Courses'
+		)
+		// Insert 'Programs' menu
+		sidebarLinks.value.splice(2, 0, {
+			label: 'Programs',
+			icon: 'Route',
+			to: 'Programs',
+			activeFor: ['Programs', 'ProgramForm'],
+		})
+	}
+}
+
 onMounted(() => {
 	addNotifications()
-	setSidebarLinks()
+	updateSidebarForLearningPaths()
 	// setUpOnboarding()
 	socket.on('publish_lms_notifications', (data) => {
 		unreadNotifications.reload()
 	})
 })
 
-const setSidebarLinks = () => {
-	sidebarSettings.reload(
-		{},
-		{
-			onSuccess(data) {
-				Object.keys(data).forEach((key) => {
-					if (!parseInt(data[key])) {
-						sidebarLinks.value = sidebarLinks.value.filter(
-							(link) => link.label.toLowerCase().split(' ').join('_') !== key
-						)
-					}
-				})
-			},
-		}
-	)
-}
+
+// setSidebarLinks is now handled by updateSidebarForLearningPaths
 
 const unreadNotifications = createResource({
 	cache: 'Unread Notifications Count',
@@ -621,12 +626,11 @@ const setUpOnboarding = () => {
 	}
 }
 
-watch(userResource, () => {
+watch([userResource, settingsStore.learningPaths], () => {
 	if (userResource.data) {
 		isModerator.value = userResource.data.is_moderator
 		isInstructor.value = userResource.data.is_instructor
-		addPrograms()
-		//addProgrammingExercises()
+		updateSidebarForLearningPaths()
 		addQuizzes()
 		addAssignments()
 		// setUpOnboarding()
