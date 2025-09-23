@@ -294,8 +294,12 @@ const addNotifications = () => {
 }
 
 const addQuizzes = () => {
-	if (isInstructor.value || isModerator.value) {
-		sidebarLinks.value.splice(4, 0, {
+	if (
+		(!sidebarLinks.value.find((l) => l.label === 'Quizzes') &&
+			isInstructor.value) ||
+		isModerator.value
+	) {
+		sidebarLinks.value.push({
 			label: 'Quizzes',
 			icon: 'CircleHelp',
 			to: 'Quizzes',
@@ -310,8 +314,12 @@ const addQuizzes = () => {
 }
 
 const addAssignments = () => {
-	if (isInstructor.value || isModerator.value) {
-		sidebarLinks.value.splice(5, 0, {
+	if (
+		(!sidebarLinks.value.find((l) => l.label === 'Assignments') &&
+			isInstructor.value) ||
+		isModerator.value
+	) {
+		sidebarLinks.value.push({
 			label: 'Assignments',
 			icon: 'Pencil',
 			to: 'Assignments',
@@ -633,8 +641,11 @@ const setupSidebarForUser = () => {
 	isModerator.value = userResource.data.is_moderator
 	isInstructor.value = userResource.data.is_instructor
 
-	// Hanya tampilkan menu "Courses" untuk admin
-	if (!userResource.data.is_system_manager) {
+	// ambil semua role user
+	const roles = userResource.data.roles || []
+
+	// ✅ kalau hanya punya 1 role dan itu LMS Student → hide Courses
+	if (roles.length === 1 && roles[0].role === 'LMS Student') {
 		sidebarLinks.value = sidebarLinks.value.filter(
 			(link) => link.label !== 'Courses',
 		)
