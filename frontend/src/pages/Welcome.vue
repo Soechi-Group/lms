@@ -1,11 +1,9 @@
 <template>
-	<div
-		class="sm:h-screen w-full flex flex-col items-center justify-center px-2"
-	>
-		<!-- tampil di desktop -->
+	<div class="sm:h-screen w-full flex flex-col items-center justify-center p-4">
+		<!-- Desktop -->
 		<img :src="GreetingDesktopImg" class="hidden sm:block w-full rounded-2xl" />
 
-		<!-- tampil di mobile -->
+		<!-- Mobile -->
 		<img :src="GreetingMobileImg" class="block sm:hidden w-full rounded-2xl" />
 	</div>
 </template>
