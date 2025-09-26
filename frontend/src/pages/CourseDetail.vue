@@ -102,8 +102,9 @@ import {
 	Badge,
 	Tooltip,
 	usePageMeta,
+	call,
 } from 'frappe-ui'
-import { computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Users, Star } from 'lucide-vue-next'
 import { sessionStore } from '@/stores/session'
 import CourseCardOverlay from '@/components/CourseCardOverlay.vue'
@@ -114,6 +115,16 @@ import CourseInstructors from '@/components/CourseInstructors.vue'
 import RelatedCourses from '@/components/RelatedCourses.vue'
 
 const { brand } = sessionStore()
+const userRoles = ref([])
+const isOnlyStudent = ref(false)
+
+onMounted(async () => {
+	const res = await call('lms.lms.api.get_user_roles')
+	userRoles.value = res.roles
+
+	isOnlyStudent.value =
+		userRoles.value.length === 3 && userRoles.value[0] === 'LMS Student'
+})
 
 const props = defineProps({
 	courseName: {
@@ -137,11 +148,16 @@ watch(
 	() => props.courseName,
 	() => {
 		course.reload()
-	}
+	},
 )
 
 const breadcrumbs = computed(() => {
-	let items = [{ label: 'Courses', route: { name: 'Courses' } }]
+	let items = [
+		{
+			label: isOnlyStudent.value ? 'Programs' : 'Courses',
+			route: { name: isOnlyStudent.value ? 'Programs' : 'Courses' },
+		},
+	]
 	items.push({
 		label: course?.data?.title,
 		route: { name: 'CourseDetail', params: { courseName: course?.data?.name } },

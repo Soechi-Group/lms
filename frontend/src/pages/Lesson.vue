@@ -32,7 +32,7 @@
 					<div class="mt-1 mb-4 text-ink-gray-7">
 						{{
 							__(
-								'This lesson is not available for preview. Please enroll in the course to access it.'
+								'This lesson is not available for preview. Please enroll in the course to access it.',
 							)
 						}}
 					</div>
@@ -351,6 +351,8 @@ const plyrSources = ref([])
 const showInlineMenu = ref(false)
 const currentTab = ref('Notes')
 let timerInterval
+const userRoles = ref([])
+const isOnlyStudent = ref(false)
 
 const tabs = ref([
 	{
@@ -374,7 +376,7 @@ const props = defineProps({
 	},
 })
 
-onMounted(() => {
+onMounted(async () => {
 	startTimer()
 	sidebarStore.isSidebarCollapsed = true
 	document.addEventListener('fullscreenchange', attachFullscreenEvent)
@@ -383,6 +385,11 @@ onMounted(() => {
 			lessonProgress.value = data.progress
 		}
 	})
+	const res = await call('lms.lms.api.get_user_roles')
+	userRoles.value = res.roles
+
+	isOnlyStudent.value =
+		userRoles.value.length === 3 && userRoles.value[0] === 'LMS Student'
 })
 
 const attachFullscreenEvent = () => {
@@ -431,7 +438,7 @@ const setupLesson = (data) => {
 	)
 		instructorEditor.value = renderEditor(
 			'instructor-content',
-			data.instructor_content
+			data.instructor_content,
 		)
 	editor.value?.isReady.then(() => {
 		checkIfDiscussionsAllowed()
@@ -500,7 +507,12 @@ const notes = createListResource({
 })
 
 const breadcrumbs = computed(() => {
-	let items = [{ label: 'Courses', route: { name: 'Courses' } }]
+	let items = [
+		{
+			label: isOnlyStudent.value ? 'Programs' : 'Courses',
+			route: { name: isOnlyStudent.value ? 'Programs' : 'Courses' },
+		},
+	]
 	items.push({
 		label: lesson?.data?.course_title,
 		route: { name: 'CourseDetail', params: { courseName: props.courseName } },
@@ -540,7 +552,7 @@ watch(
 	[() => route.params.chapterNumber, () => route.params.lessonNumber],
 	async (
 		[newChapterNumber, newLessonNumber],
-		[oldChapterNumber, oldLessonNumber]
+		[oldChapterNumber, oldLessonNumber],
 	) => {
 		if (newChapterNumber || newLessonNumber) {
 			plyrSources.value = []
@@ -551,7 +563,7 @@ watch(
 			checkIfDiscussionsAllowed()
 			checkQuiz()
 		}
-	}
+	},
 )
 
 const resetLessonState = (newChapterNumber, newLessonNumber) => {
@@ -618,7 +630,7 @@ watch(
 		getPlyrSource()
 		updateNotes()
 		if (data.icon == 'icon-youtube') clearInterval(timerInterval)
-	}
+	},
 )
 
 const getPlyrSource = async () => {
@@ -742,7 +754,7 @@ const enrollStudent = () => {
 			onSuccess() {
 				window.location.reload()
 			},
-		}
+		},
 	)
 }
 
