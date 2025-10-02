@@ -295,7 +295,7 @@ const addNotifications = () => {
 
 const addQuizzes = () => {
 	if (
-		(!sidebarLinks.value.find((l) => l.label === 'Quizzes') &&
+		(!sidebarLinks.value.find((l) => l && l.label === 'Quizzes') &&
 			isInstructor.value) ||
 		isModerator.value
 	) {
@@ -315,7 +315,7 @@ const addQuizzes = () => {
 
 const addAssignments = () => {
 	if (
-		(!sidebarLinks.value.find((l) => l.label === 'Assignments') &&
+		(!sidebarLinks.value.find((l) => l && l.label === 'Assignments') &&
 			isInstructor.value) ||
 		isModerator.value
 	) {
@@ -353,6 +353,10 @@ const addPrograms = () => {
 	let activeFor = ['Programs', 'ProgramForm']
 	let canAddProgram = false
 
+	// Bersihkan array dulu (buang undefined/null/link tanpa label)
+	sidebarLinks.value = sidebarLinks.value.filter((l) => l && l.label)
+
+	// Kalau user hanya student → hide Courses
 	if (
 		!isInstructor.value &&
 		!isModerator.value &&
@@ -368,31 +372,29 @@ const addPrograms = () => {
 		canAddProgram = true
 	}
 
-	if (
-		canAddProgram &&
-		!sidebarLinks.value.find((l) => l.label === 'Programs')
-	) {
+	// Cegah duplikat Programs
+	const alreadyHasPrograms = sidebarLinks.value.some(
+		(l) => l && l.label === 'Programs',
+	)
+
+	if (canAddProgram && !alreadyHasPrograms) {
+		const programLink = {
+			label: 'Programs',
+			icon: 'Route',
+			to: 'Programs',
+			activeFor: activeFor,
+		}
+
 		// cari posisi Dashboard
 		const dashboardIndex = sidebarLinks.value.findIndex(
-			(l) => l.label === 'Dashboard',
+			(l) => l && l.label === 'Dashboard',
 		)
 
-		// kalau ketemu, insert setelah Dashboard
 		if (dashboardIndex !== -1) {
-			sidebarLinks.value.splice(dashboardIndex + 1, 0, {
-				label: 'Programs',
-				icon: 'Route',
-				to: 'Programs',
-				activeFor: activeFor,
-			})
+			sidebarLinks.value.splice(dashboardIndex + 1, 0, programLink)
 		} else {
-			// fallback: kalau Dashboard nggak ada, push di awal
-			sidebarLinks.value.unshift({
-				label: 'Programs',
-				icon: 'Route',
-				to: 'Programs',
-				activeFor: activeFor,
-			})
+			// fallback: kalau Dashboard nggak ada, taruh di awal
+			sidebarLinks.value.unshift(programLink)
 		}
 	}
 }
@@ -638,13 +640,16 @@ const articles = ref([
 const setupSidebarForUser = () => {
 	if (!userResource.data) return
 
+	// reset ulang ke default link, lalu bersihkan undefined/null
+	sidebarLinks.value = (getSidebarLinks() || []).filter((l) => l && l.label)
+
 	isModerator.value = userResource.data.is_moderator
 	isInstructor.value = userResource.data.is_instructor
 
 	// ambil semua role user
 	const roles = userResource.data.roles || []
 
-	// ✅ kalau hanya punya 1 role dan itu LMS Student → hide Courses
+	// ✅ kalau hanya punya 1 role = LMS Student → hide Courses
 	if (roles.length === 1 && roles[0].role === 'LMS Student') {
 		sidebarLinks.value = sidebarLinks.value.filter(
 			(link) => link.label !== 'Courses',
@@ -652,9 +657,9 @@ const setupSidebarForUser = () => {
 	}
 
 	addPrograms()
-	// addProgrammingExercises()
 	addQuizzes()
 	addAssignments()
+	// addProgrammingExercises()
 	// setUpOnboarding()
 }
 
