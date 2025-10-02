@@ -155,7 +155,7 @@
 				:label="__('Program Course')"
 				:description="
 					__(
-						'Only courses for which self learning is disabled can be added to program.'
+						'Only courses for which self learning is disabled can be added to program.',
 					)
 				"
 			/>
@@ -163,11 +163,8 @@
 			<Link
 				v-if="currentForm == 'member'"
 				v-model="member"
-				doctype="User"
-				:filters="{
-					ignore_user_type: 1,
-				}"
-				:label="__('Program Member')"
+				doctype="Crew Rank"
+				:label="__('Crew Rank')"
 				:onCreate="(value, close) => openSettings('Members', close)"
 			/>
 		</template>
@@ -190,7 +187,7 @@ import {
 	usePageMeta,
 	toast,
 } from 'frappe-ui'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Plus, Trash2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { sessionStore } from '@/stores/session'
@@ -212,12 +209,52 @@ const props = defineProps({
 	},
 })
 
+const rankCache = ref({})
+
 const program = createDocumentResource({
 	doctype: 'LMS Program',
 	name: props.programName,
 	auto: true,
 	cache: ['program', props.programName],
 })
+
+watch(
+	() => program.doc?.program_members,
+	async (members) => {
+		if (!members) return
+
+		const missingRanks = [
+			...new Set(
+				members
+					.filter((m) => m.crew_rank && !rankCache.value[m.crew_rank])
+					.map((m) => m.crew_rank),
+			),
+		]
+
+		if (missingRanks.length) {
+			try {
+				const res = await call('frappe.client.get_list', {
+					doctype: 'Crew Rank',
+					filters: [['name', 'in', missingRanks]],
+					fields: ['name', 'rank_name'],
+				})
+
+				res.forEach((r) => {
+					rankCache.value[r.name] = r.rank_name
+				})
+			} catch (err) {
+				console.error('Failed to fetch ranks', err)
+			}
+		}
+
+		members.forEach((m) => {
+			if (m.crew_rank) {
+				m.crew_rank_name = rankCache.value[m.crew_rank] || m.crew_rank
+			}
+		})
+	},
+	{ deep: true, immediate: true },
+)
 
 const addProgramCourse = () => {
 	program.setValue.submit(
@@ -237,30 +274,50 @@ const addProgramCourse = () => {
 			onError(err) {
 				toast.error(err.messages?.[0] || err)
 			},
-		}
+		},
 	)
 }
 
-const addProgramMember = () => {
-	program.setValue.submit(
-		{
-			program_members: [
-				...program.doc.program_members,
-				{ member: member.value },
-			],
-		},
-		{
-			onSuccess(data) {
-				showDialog.value = false
-				member.value = null
-				toast.success(__('Member added to program'))
-				program.reload()
-			},
-			onError(err) {
-				toast.error(err.messages?.[0] || err)
-			},
+const addProgramMember = async () => {
+	try {
+		const member_list = await call('lms.lms.api.get_users_by_ranks', {
+			rank: member.value,
+		})
+
+		if (!member_list.length) {
+			toast.error(__('No users found for this rank'))
+			return
 		}
-	)
+
+		const updatedMembers = [
+			...program.doc.program_members,
+			...member_list.map((u) => ({
+				member: u.name,
+				crew_rank: u.crew_rank,
+				full_name: u.full_name,
+			})),
+		]
+
+		program.setValue.submit(
+			{
+				program_members: updatedMembers,
+			},
+			{
+				onSuccess(data) {
+					showDialog.value = false
+					member.value = null
+					toast.success(__('Member(s) added to program'))
+					program.reload()
+				},
+				onError(err) {
+					toast.error(err.messages?.[0] || err)
+				},
+			},
+		)
+	} catch (err) {
+		console.error(err)
+		toast.error(__('Failed to fetch members'))
+	}
 }
 
 const remove = (selections, unselectAll, doctype) => {
@@ -268,7 +325,7 @@ const remove = (selections, unselectAll, doctype) => {
 	program.setValue.submit(
 		{
 			[doctype]: program.doc[doctype].filter(
-				(row) => !selections.includes(row.name)
+				(row) => !selections.includes(row.name),
 			),
 		},
 		{
@@ -280,7 +337,7 @@ const remove = (selections, unselectAll, doctype) => {
 			onError(err) {
 				toast.error(err.messages?.[0] || err)
 			},
-		}
+		},
 	)
 }
 
@@ -306,7 +363,7 @@ const updateOrder = (e) => {
 			onError(err) {
 				toast.error(err.messages?.[0] || err)
 			},
-		}
+		},
 	)
 }
 
@@ -340,6 +397,12 @@ const memberColumns = computed(() => {
 		{
 			label: 'Member',
 			key: 'member',
+			width: 3,
+			align: 'left',
+		},
+		{
+			label: 'Crew Rank',
+			key: 'crew_rank_name',
 			width: 3,
 			align: 'left',
 		},

@@ -387,6 +387,21 @@ def get_evaluator_details(evaluator):
     }
 
 
+@frappe.whitelist()
+def get_users_by_ranks(rank):
+    users = frappe.get_all(
+        "User",
+        {
+            "enabled": 1,
+            "name": ["not in", ["Administrator", "Guest"]],
+            "crew_rank": ["in", rank],
+        },
+        ["name", "full_name", "user_image", "username", "crew_rank"],
+    )
+
+    return users
+
+
 @frappe.whitelist(allow_guest=True)
 def get_certified_participants(filters=None, start=0, page_length=100):
     or_filters = {}
