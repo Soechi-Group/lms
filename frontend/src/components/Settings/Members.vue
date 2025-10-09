@@ -32,7 +32,7 @@
 				</template>
 			</FormControl>
 			<div class="overflow-y-scroll h-[60vh]">
-				<ul class="divide-y">
+				<ul class="divide-y py-5">
 					<li
 						v-for="member in memberList"
 						class="flex items-center justify-between py-2 cursor-pointer"
@@ -54,6 +54,9 @@
 								</div>
 								<div class="text-sm text-ink-gray-7">
 									{{ member.name }}
+								</div>
+								<div class="text-sm text-ink-gray-7">
+									{{ member.crew_rank_name }}
 								</div>
 							</div>
 						</div>
@@ -87,13 +90,15 @@
 		:options="{
 			title: __('Add a new member'),
 			size: 'lg',
-			actions: [{
-				label: __('Add'),
-				variant: 'solid',
-				onClick({ close }: any) {
-					addMember(close)
-				}
-			}]
+			actions: [
+				{
+					label: __('Add'),
+					variant: 'solid',
+					onClick({ close }: any) {
+						addMember(close)
+					},
+				},
+			],
 		}"
 	>
 		<template #body-content>
@@ -113,6 +118,14 @@
 					class="w-full"
 				/>
 			</div>
+			<div class="flex items-center pt-5">
+				<Link
+					class="w-full"
+					v-model="member.crew_rank"
+					doctype="Crew Rank"
+					:label="__('Crew Rank')"
+				/>
+			</div>
 		</template>
 	</Dialog>
 </template>
@@ -130,6 +143,7 @@ import { ref, watch, reactive, inject } from 'vue'
 import { RefreshCw, Plus, Search, Shield } from 'lucide-vue-next'
 import { useOnboarding } from 'frappe-ui/frappe'
 import type { User } from '@/components/Settings/types'
+import Link from '../Controls/Link.vue'
 
 type Member = {
 	username: string
@@ -137,6 +151,7 @@ type Member = {
 	name: string
 	role?: string
 	user_image?: string
+	crew_rank_name?: string
 }
 
 const router = useRouter()
@@ -153,6 +168,7 @@ const { updateOnboardingStep } = useOnboarding('learning')
 const member = reactive({
 	email: '',
 	first_name: '',
+	crew_rank: '',
 })
 
 const props = defineProps({
@@ -203,20 +219,23 @@ const newMember = createResource({
 				doctype: 'User',
 				first_name: member.first_name,
 				email: member.email,
+				crew_rank: member.crew_rank,
 			},
 		}
 	},
 	auto: false,
 	onSuccess(data: Member) {
 		show.value = false
-		// if (user?.data?.is_system_manager) updateOnboardingStep('invite_students')
 
-		router.push({
-			name: 'ProfileRoles',
-			params: {
-				username: data.username,
-			},
-		})
+		// Reset field form
+		member.email = ''
+		member.first_name = ''
+		member.crew_rank = ''
+
+		// Reset daftar member & reload ulang
+		memberList.value = []
+		start.value = 0
+		members.reload()
 	},
 })
 

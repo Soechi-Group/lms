@@ -387,6 +387,21 @@ def get_evaluator_details(evaluator):
     }
 
 
+@frappe.whitelist()
+def get_users_by_ranks(rank):
+    users = frappe.get_all(
+        "User",
+        {
+            "enabled": 1,
+            "name": ["not in", ["Administrator", "Guest"]],
+            "crew_rank": ["in", rank],
+        },
+        ["name", "full_name", "user_image", "username", "crew_rank"],
+    )
+
+    return users
+
+
 @frappe.whitelist(allow_guest=True)
 def get_certified_participants(filters=None, start=0, page_length=100):
     or_filters = {}
@@ -699,17 +714,35 @@ def get_members(start=0, search=""):
         or_filters["full_name"] = ["like", f"%{search}%"]
         or_filters["email"] = ["like", f"%{search}%"]
 
+    # Ambil semua member
     members = frappe.get_all(
         "User",
         filters=filters,
-        fields=["name", "full_name", "user_image",
-                "username", "last_active"],
+        fields=[
+            "name",
+            "full_name",
+            "user_image",
+            "username",
+            "last_active",
+            "crew_rank"
+        ],
         or_filters=or_filters,
         page_length=20,
         start=start,
     )
 
+    # Ambil semua rank untuk mapping nama rank
+    rank_map = {
+        r.name: r.rank_name
+        for r in frappe.get_all("Crew Rank", fields=["name", "rank_name"])
+    }
+
+    # Tambahkan nama rank & role user
     for member in members:
+        # Tambahkan nama rank
+        member["crew_rank_name"] = rank_map.get(member.crew_rank, None)
+
+        # Cek role user
         roles = frappe.get_all(
             "Has Role",
             {
@@ -718,6 +751,7 @@ def get_members(start=0, search=""):
             },
             pluck="role",
         )
+
         if "Moderator" in roles:
             member.role = "Moderator"
         elif "Course Creator" in roles:
@@ -726,6 +760,8 @@ def get_members(start=0, search=""):
             member.role = "Batch Evaluator"
         elif "LMS Student" in roles:
             member.role = "LMS Student"
+        else:
+            member.role = None
 
     return members
 
