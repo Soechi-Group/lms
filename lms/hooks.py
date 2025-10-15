@@ -108,6 +108,9 @@ doc_events = {
         "after_insert": "lms.lms.user.after_insert",
         "on_update": "lms.lms.user.on_update",
     },
+    "LMS Enrollment": {
+        "after_insert": "lms.lms.doctype.lms_enrollment.enrollment_hooks.create_enrollment_history",
+    }
 }
 
 # Scheduled Tasks
