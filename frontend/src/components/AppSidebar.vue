@@ -233,7 +233,6 @@ const iconProps = {
 }
 
 onMounted(() => {
-	addNotifications()
 	setSidebarLinks()
 	socket.on('publish_lms_notifications', (data) => {
 		unreadNotifications.reload()
@@ -656,6 +655,7 @@ const setupSidebarForUser = () => {
 		)
 	}
 
+	addNotifications()
 	addPrograms()
 	addQuizzes()
 	addAssignments()
