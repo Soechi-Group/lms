@@ -117,54 +117,73 @@ def has_website_permission(doc, ptype, user, verbose=False):
 
 
 def send_expiry_notifications():
-    # Ambil semua certificate yang punya expiry_date (bukan kosong)
+    # Ambil semua certificate yang sudah expired (dan punya expiry_date)
     certs = frappe.get_all(
         "LMS Certificate",
-        filters={"expiry_date": ["is", "set"]},
-        fields=["name", "member", "course_title", "expiry_date"]
+        filters={
+            "expiry_date": ["<=", getdate(nowdate())]
+        },
+        fields=["name", "member", "course", "course_title", "expiry_date"]
     )
 
     notif = frappe.get_doc("Notification", "Certificate Expired (student)")
 
-    today = getdate(nowdate())
-
     for c in certs:
-        # Lewati jika expiry_date kosong (safety check tambahan)
+        # Skip jika expiry_date kosong (artinya lifetime)
         if not c.expiry_date:
             continue
 
-        expiry_date = getdate(c.expiry_date)
+        # Kirim notifikasi
+        doc = frappe.get_doc("LMS Certificate", c.name)
+        notif.send(doc)
 
-        # Kirim notif hanya jika certificate sudah expired
-        if expiry_date <= today:
-            doc = frappe.get_doc("LMS Certificate", c.name)
-            notif.send(doc)
+        # Cari enrollment student untuk course terkait
+        enrollment = frappe.get_all(
+            "LMS Enrollment",
+            filters={
+                "member": c.member,
+                "course": c.course
+            },
+            fields=["name", "progress"]
+        )
+
+        if enrollment:
+            enrollment_doc = frappe.get_doc(
+                "LMS Enrollment", enrollment[0].name)
+
+            # Reset progress ke 0 jika sebelumnya tidak 0
+            if enrollment_doc.progress > 0:
+                enrollment_doc.progress = 0
+                enrollment_doc.save(ignore_permissions=True)
+
+                frappe.logger("lms").info(
+                    f"[CERTIFICATE EXPIRED] Reset progress for member {c.member} in course {c.course}"
+                )
+
+            # Hapus record progress di "LMS Course Progress"
+            course_progress_records = frappe.get_all(
+                "LMS Course Progress",
+                filters={
+                    "member": c.member,
+                    "course": c.course
+                },
+                pluck="name"
+            )
+
+            for rec in course_progress_records:
+                frappe.delete_doc("LMS Course Progress", rec,
+                                  ignore_permissions=True)
+                frappe.logger("lms").info(
+                    f"Deleted course progress record {rec} for {c.member} in {c.course}"
+                )
+
+    frappe.db.commit()
 
 
 @frappe.whitelist()
 def create_certificate(course):
-    certificate = is_certified(course)
-
-    if certificate:
-        return frappe.db.get_value(
-            "LMS Certificate",
-            certificate,
-            ["name", "course", "template", "expiry_date"],
-            as_dict=True,
-        )
-
-    # Ambil template default
-    default_certificate_template = frappe.db.get_value(
-        "Property Setter",
-        {"doc_type": "LMS Certificate", "property": "default_print_format"},
-        "value",
-    )
-    if not default_certificate_template:
-        default_certificate_template = frappe.db.get_value(
-            "Print Format",
-            {"doc_type": "LMS Certificate"},
-            "name",
-        )
+    # Cek apakah user sudah punya sertifikat untuk course ini
+    certificate_name = is_certified(course)
 
     # Ambil masa berlaku dari course (Select field)
     validity = frappe.db.get_value(
@@ -186,8 +205,39 @@ def create_certificate(course):
         if years > 0:
             expiry_date = add_years(issue_date, years)
 
-    # Buat dokumen certificate
-    certificate = frappe.get_doc(
+    # Jika sudah ada certificate, update expiry_date saja
+    if certificate_name:
+        cert_doc = frappe.get_doc("LMS Certificate", certificate_name)
+
+        # Update expiry_date berdasarkan validity baru
+        cert_doc.expiry_date = expiry_date
+        cert_doc.issue_date = issue_date
+        cert_doc.save(ignore_permissions=True)
+
+        frappe.logger("lms").info(
+            f"Updated certificate {cert_doc.name} expiry_date to {expiry_date}"
+        )
+
+        return frappe.db.get_value(
+            "LMS Certificate",
+            cert_doc.name,
+            ["name", "course", "template", "expiry_date"],
+            as_dict=True,
+        )
+
+    # Jika belum ada certificate, ambil template default
+    default_certificate_template = frappe.db.get_value(
+        "Property Setter",
+        {"doc_type": "LMS Certificate", "property": "default_print_format"},
+        "value",
+    )
+    if not default_certificate_template:
+        default_certificate_template = frappe.db.get_value(
+            "Print Format", {"doc_type": "LMS Certificate"}, "name"
+        )
+
+    # Buat dokumen certificate baru
+    cert_doc = frappe.get_doc(
         {
             "doctype": "LMS Certificate",
             "member": frappe.session.user,
@@ -197,6 +247,10 @@ def create_certificate(course):
             "template": default_certificate_template,
         }
     )
-    certificate.save(ignore_permissions=True)
+    cert_doc.save(ignore_permissions=True)
 
-    return certificate
+    frappe.logger("lms").info(
+        f"Created new certificate {cert_doc.name} for course {course} (expiry: {expiry_date})"
+    )
+
+    return cert_doc

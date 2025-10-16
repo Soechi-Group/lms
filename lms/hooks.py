@@ -110,6 +110,7 @@ doc_events = {
     },
     "LMS Enrollment": {
         "after_insert": "lms.lms.doctype.lms_enrollment.enrollment_hooks.create_enrollment_history",
+        "on_update": "lms.lms.doctype.lms_enrollment.enrollment_hooks.create_reenrollment_history",
     }
 }
 
