@@ -6,8 +6,7 @@ from frappe import _
 from frappe.email.doctype.email_template.email_template import get_email_template
 from frappe.model.document import Document
 from frappe.model.naming import make_autoname
-from frappe.utils import add_years, nowdate
-
+from frappe.utils import add_years, nowdate, getdate
 from lms.lms.utils import is_certified
 
 
@@ -115,6 +114,31 @@ def has_website_permission(doc, ptype, user, verbose=False):
     if doc.member == user and ptype == "create":
         return True
     return False
+
+
+def send_expiry_notifications():
+    # Ambil semua certificate yang punya expiry_date (bukan kosong)
+    certs = frappe.get_all(
+        "LMS Certificate",
+        filters={"expiry_date": ["is", "set"]},
+        fields=["name", "member", "course_title", "expiry_date"]
+    )
+
+    notif = frappe.get_doc("Notification", "Certificate Expired (student)")
+
+    today = getdate(nowdate())
+
+    for c in certs:
+        # Lewati jika expiry_date kosong (safety check tambahan)
+        if not c.expiry_date:
+            continue
+
+        expiry_date = getdate(c.expiry_date)
+
+        # Kirim notif hanya jika certificate sudah expired
+        if expiry_date <= today:
+            doc = frappe.get_doc("LMS Certificate", c.name)
+            notif.send(doc)
 
 
 @frappe.whitelist()
