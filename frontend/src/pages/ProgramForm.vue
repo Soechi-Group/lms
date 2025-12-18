@@ -552,9 +552,14 @@ const saveProgram = () => {
 		doctype: 'LMS Program',
 		docname: program.doc.name,
 		name: program.doc.title,
-	}).then((data) => {
-		router.push({ name: 'ProgramForm', params: { programName: data } })
 	})
+		.then((data) => {
+			toast.success(__('Program saved successfully'), 'message', 3000)
+			router.push({ name: 'ProgramForm', params: { programName: data } })
+		})
+		.catch((err) => {
+			toast.error(err.messages?.[0] || err)
+		})
 }
 
 const courseColumns = computed(() => {
