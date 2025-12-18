@@ -55,9 +55,9 @@ def sync_user_program_by_rank(doc):
             for p in programs:
                 program = frappe.get_doc("LMS Program", p.name)
 
-                # cek apakah program punya member template dengan rank ini
-                for m in program.program_members:
-                    if m.crew_rank == doc.crew_rank:
+                # cek apakah program punya crew_rank (LMS Crew Rank) yang cocok dengan user
+                for cr in getattr(program, "crew_ranks", []):
+                    if cr.crew_rank == doc.crew_rank:
                         matched_programs.add(program.name)
 
                         # cek apakah user sudah jadi member program ini
@@ -80,7 +80,7 @@ def sync_user_program_by_rank(doc):
                                     f"[AUTO-UPDATE] Rank user {doc.full_name} diupdate di {program.title}"
                                 )
                         else:
-                            # tambahkan user baru
+                            # tambahkan user baru sebagai child doc (LMS Program Member)
                             program.append("program_members", {
                                 "member": doc.name,
                                 "crew_rank": doc.crew_rank,
