@@ -72,8 +72,60 @@
 			</ListView>
 		</div>
 
-		<!-- Members -->
+		<!-- Crew Rank -->
 		<div>
+			<div class="flex items-center justify-between mb-2">
+				<div class="text-lg text-ink-gray-9 font-semibold">
+					{{ __('Crew Ranks') }}
+				</div>
+				<Button
+					@click="
+						() => {
+							currentForm = 'lms_crew_rank'
+							showDialog = true
+						}
+					"
+				>
+					<template #prefix>
+						<Plus class="w-4 h-4" />
+					</template>
+					{{ __('Add Crew Rank') }}
+				</Button>
+			</div>
+
+			<ListView
+				:columns="crewRankColumns"
+				:rows="program.doc.crew_ranks"
+				row-key="name"
+				:options="{
+					showTooltip: false,
+				}"
+			>
+				<ListHeader
+					class="mb-2 grid items-center space-x-4 rounded bg-surface-gray-2 p-2"
+				>
+					<ListHeaderItem :item="item" v-for="item in crewRankColumns" />
+				</ListHeader>
+				<ListRows>
+					<ListRow :row="row" v-for="row in program.doc.crew_ranks" />
+				</ListRows>
+				<ListSelectBanner>
+					<template #actions="{ unselectAll, selections }">
+						<div class="flex gap-2">
+							<Button
+								variant="ghost"
+								@click="remove(selections, unselectAll, 'crew_ranks')"
+							>
+								<Trash2 class="h-4 w-4 stroke-1.5" />
+							</Button>
+						</div>
+					</template>
+				</ListSelectBanner>
+			</ListView>
+		</div>
+
+		<!-- Members -->
+		<!-- <div>
 			<div class="flex items-center justify-between mb-2">
 				<div class="text-lg text-ink-gray-9 font-semibold">
 					{{ __('Program Members') }}
@@ -122,7 +174,7 @@
 					</template>
 				</ListSelectBanner>
 			</ListView>
-		</div>
+		</div> -->
 	</div>
 
 	<Dialog
@@ -131,7 +183,9 @@
 			title:
 				currentForm == 'course'
 					? __('New Program Course')
-					: __('New Program Member'),
+					: currentForm == 'lms_crew_rank'
+						? __('New Crew Rank')
+						: __('New Program Member'),
 			actions: [
 				{
 					label: __('Add'),
@@ -139,7 +193,9 @@
 					onClick: () =>
 						currentForm == 'course'
 							? addProgramCourse(close)
-							: addProgramMember(close),
+							: currentForm == 'lms_crew_rank'
+								? addProgramCrewRank(close)
+								: addProgramMember(close),
 				},
 			],
 		}"
@@ -160,12 +216,19 @@
 				"
 			/>
 
-			<Link
+			<!-- <Link
 				v-if="currentForm == 'member'"
 				v-model="member"
 				doctype="Crew Rank"
 				:label="__('Crew Rank')"
 				:onCreate="(value, close) => openSettings('Members', close)"
+			/> -->
+
+			<Link
+				v-if="currentForm == 'lms_crew_rank'"
+				v-model="crew_rank"
+				doctype="Crew Rank"
+				:label="__('Crew Rank')"
 			/>
 		</template>
 	</Dialog>
@@ -200,6 +263,7 @@ const showDialog = ref(false)
 const currentForm = ref(null)
 const course = ref(null)
 const member = ref(null)
+const crew_rank = ref(null)
 const router = useRouter()
 
 const props = defineProps({
@@ -278,6 +342,86 @@ const addProgramCourse = () => {
 	)
 }
 
+const addProgramCrewRank = () => {
+	if (!crew_rank.value) {
+		toast.error(__('Please select a crew rank'))
+		return
+	}
+
+	const alreadyAdded = (program.doc.crew_ranks || []).some(
+		(r) => r.crew_rank === crew_rank.value || r.name === crew_rank.value,
+	)
+
+	if (alreadyAdded) {
+		toast.error(__('Crew rank already added to program'))
+		return
+	}
+
+	program.setValue.submit(
+		{
+			crew_ranks: [...program.doc.crew_ranks, { crew_rank: crew_rank.value }],
+		},
+		{
+			onSuccess: async (data) => {
+				const addedRank = crew_rank.value
+				showDialog.value = false
+				crew_rank.value = null
+				toast.success(__('Crew rank added to program'))
+
+				// fetch users for the added rank and add to program_members
+				try {
+					const member_list = await call('lms.lms.api.get_users_by_ranks', {
+						rank: addedRank,
+					})
+
+					if (member_list && member_list.length) {
+						const existing = new Set(
+							(program.doc.program_members || []).map((m) => m.member),
+						)
+
+						const newMembers = member_list
+							.filter((u) => !existing.has(u.name))
+							.map((u) => ({
+								member: u.name,
+								crew_rank: u.crew_rank,
+								full_name: u.full_name,
+							}))
+
+						if (newMembers.length) {
+							program.setValue.submit(
+								{
+									program_members: [
+										...(program.doc.program_members || []),
+										...newMembers,
+									],
+								},
+								{
+									onSuccess() {
+										toast.success(__('Members added to program'))
+										program.reload()
+									},
+									onError(err) {
+										toast.error(err.messages?.[0] || err)
+									},
+								},
+							)
+							return
+						}
+					}
+					// fallback reload if no new members
+					program.reload()
+				} catch (err) {
+					console.error('Failed to fetch members for rank', err)
+					program.reload()
+				}
+			},
+			onError(err) {
+				toast.error(err.messages?.[0] || err)
+			},
+		},
+	)
+}
+
 const addProgramMember = async () => {
 	try {
 		const member_list = await call('lms.lms.api.get_users_by_ranks', {
@@ -322,6 +466,42 @@ const addProgramMember = async () => {
 
 const remove = (selections, unselectAll, doctype) => {
 	selections = Array.from(selections)
+
+	// If removing crew_ranks, also remove program_members belonging to those ranks
+	if (doctype === 'crew_ranks') {
+		const remainingCrewRanks = (program.doc.crew_ranks || []).filter(
+			(row) => !selections.includes(row.name),
+		)
+
+		// Determine which rank identifiers were removed. Some rows may store rank id in `crew_rank` or use `name`.
+		const removedRanks = (program.doc.crew_ranks || [])
+			.filter((row) => selections.includes(row.name))
+			.map((r) => r.crew_rank || r.name)
+
+		const remainingMembers = (program.doc.program_members || []).filter(
+			(m) => !removedRanks.includes(m.crew_rank),
+		)
+
+		program.setValue.submit(
+			{
+				crew_ranks: remainingCrewRanks,
+				program_members: remainingMembers,
+			},
+			{
+				onSuccess(data) {
+					unselectAll()
+					toast.success(__('Items removed successfully'))
+					program.reload()
+				},
+				onError(err) {
+					toast.error(err.messages?.[0] || err)
+				},
+			},
+		)
+
+		return
+	}
+
 	program.setValue.submit(
 		{
 			[doctype]: program.doc[doctype].filter(
@@ -388,6 +568,17 @@ const courseColumns = computed(() => {
 			label: 'ID',
 			key: 'course',
 			width: 3,
+		},
+	]
+})
+
+const crewRankColumns = computed(() => {
+	return [
+		{
+			label: 'Crew Rank',
+			key: 'crew_name',
+			width: 6,
+			align: 'left',
 		},
 	]
 })
