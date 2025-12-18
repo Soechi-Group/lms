@@ -185,7 +185,7 @@
 							:label="__('Short Introduction')"
 							:placeholder="
 								__(
-									'A one line introduction to the course that appears on the course card'
+									'A one line introduction to the course that appears on the course card',
 								)
 							"
 							:required="true"
@@ -209,7 +209,7 @@
 							:label="__('Preview Video')"
 							:placeholder="
 								__(
-									'Paste the youtube link of a short video introducing the course'
+									'Paste the youtube link of a short video introducing the course',
 								)
 							"
 						/>
@@ -253,6 +253,18 @@
 						</div>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 							<div class="space-y-5">
+								<FormControl
+									v-if="course.enable_certification"
+									v-model="course.certificate_validity"
+									:label="__('Certificate Validity')"
+									type="select"
+									:options="[
+										{ label: 'Lifetime', value: 'Lifetime' },
+										{ label: '1 Year', value: '1 Year' },
+										{ label: '2 Year', value: '2 Year' },
+										{ label: '3 Year', value: '3 Year' },
+									]"
+								/>
 								<FormControl
 									v-if="course.paid_course || course.paid_certificate"
 									v-model="course.course_price"
@@ -383,6 +395,7 @@ const course = reactive({
 	paid_course: false,
 	paid_certificate: false,
 	course_price: '',
+	certificate_validity: '',
 	currency: '',
 	evaluator: '',
 })
@@ -566,7 +579,7 @@ const editCourse = () => {
 			onError(err) {
 				toast.error(err.messages?.[0] || err)
 			},
-		}
+		},
 	)
 }
 
@@ -587,7 +600,7 @@ const trashCourse = () => {
 	$dialog({
 		title: __('Delete Course'),
 		message: __(
-			'Deleting the course will also delete all its chapters and lessons. Are you sure you want to delete this course?'
+			'Deleting the course will also delete all its chapters and lessons. Are you sure you want to delete this course?',
 		),
 		actions: [
 			{
@@ -609,7 +622,7 @@ watch(
 		if (newVal) {
 			fetchCourseInfo()
 		}
-	}
+	},
 )
 
 const updateTags = () => {

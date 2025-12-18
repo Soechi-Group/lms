@@ -476,6 +476,18 @@ const markProgress = () => {
 	}
 }
 
+const generateCertificate = createResource({
+	url: 'lms.lms.doctype.lms_certificate.lms_certificate.create_certificate',
+	makeParams() {
+		return {
+			course: props.courseName,
+		}
+	},
+	onSuccess(data) {
+		console.log('certificate generated', data)
+	},
+})
+
 const progress = createResource({
 	url: 'lms.lms.doctype.course_lesson.course_lesson.save_progress',
 	makeParams() {
@@ -486,6 +498,10 @@ const progress = createResource({
 	},
 	onSuccess(data) {
 		lessonProgress.value = data
+
+		if (data == 100) {
+			generateCertificate.submit()
+		}
 	},
 })
 

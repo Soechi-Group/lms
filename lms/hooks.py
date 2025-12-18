@@ -108,6 +108,10 @@ doc_events = {
         "after_insert": "lms.lms.user.after_insert",
         "on_update": "lms.lms.user.on_update",
     },
+    "LMS Enrollment": {
+        "after_insert": "lms.lms.doctype.lms_enrollment.enrollment_hooks.create_enrollment_history",
+        "on_update": "lms.lms.doctype.lms_enrollment.enrollment_hooks.create_reenrollment_history",
+    }
 }
 
 # Scheduled Tasks
@@ -124,6 +128,7 @@ scheduler_events = {
         "lms.lms.doctype.lms_payment.lms_payment.send_payment_reminder",
         "lms.lms.doctype.lms_batch.lms_batch.send_batch_start_reminder",
         "lms.lms.doctype.lms_live_class.lms_live_class.send_live_class_reminder",
+        "lms.lms.doctype.lms_certificate.lms_certificate.send_expiry_notifications"
     ],
 }
 
