@@ -229,7 +229,11 @@
 				v-model="crew_rank"
 				doctype="Crew Rank"
 				:label="__('Crew Rank')"
-			/>
+			>
+				<template #item-label="{ option }">
+					{{ option.label }}
+				</template>
+			</Link>
 		</template>
 	</Dialog>
 </template>
