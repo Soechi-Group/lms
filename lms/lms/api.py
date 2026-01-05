@@ -152,6 +152,9 @@ def get_user_info():
          "full_name", "user_type", "username"],
         as_dict=1,
     )
+
+    crew_rank = frappe.get_cached_value("User", user.name, "crew_rank")
+
     user["roles"] = frappe.get_roles(user.name)
     user.is_instructor = "Course Creator" in user.roles
     user.is_moderator = "Moderator" in user.roles
@@ -161,6 +164,10 @@ def get_user_info():
     user.is_system_manager = "System Manager" in user.roles
     user.sitename = frappe.local.site
     user.developer_mode = frappe.conf.developer_mode
+    if crew_rank:
+        user.crew_rank = frappe.get_cached_value(
+            "Crew Rank", crew_rank, "rank_name"
+        )
     if user.is_fc_site and user.is_system_manager:
         user.site_info = current_site_info()
     return user
