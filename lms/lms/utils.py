@@ -11,6 +11,7 @@ from frappe.desk.doctype.dashboard_chart.dashboard_chart import get_result
 from frappe.desk.doctype.notification_log.notification_log import make_notification_logs
 from frappe.desk.notifications import extract_mentions
 from frappe.utils import (
+    add_days,
     add_months,
     ceil,
     cint,
@@ -2037,8 +2038,9 @@ def get_programs():
 
 @frappe.whitelist()
 def get_mandatory_program_courses_by_user(crew_rank=None):
+    user = frappe.session.user
 
-    # 1. Ambil program yang sesuai crew rank (via child table)
+    # 1. Ambil program sesuai crew rank
     programs = frappe.get_all(
         "LMS Program",
         filters=[
@@ -2067,13 +2069,41 @@ def get_mandatory_program_courses_by_user(crew_rank=None):
         order_by="idx"
     )
 
-    # 3. Optional: ambil detail course (kalau perlu)
+    if not program_courses:
+        return []
+
+    courses_list = [pc.course for pc in program_courses]
+
+    # 3. Ambil enrollment user (sekali query, penting!)
+    enrollments = frappe.get_all(
+        "LMS Enrollment",
+        filters={
+            "member": user,
+            "course": ["in", courses_list]
+        },
+        fields=[
+            "course",
+            "current_lesson"
+        ]
+    )
+
+    # Map: course -> enrollment
+    enrollment_map = {
+        e.course: e for e in enrollments
+    }
+
+    # 4. Build response
     courses = []
     for pc in program_courses:
+        enrollment = enrollment_map.get(pc.course)
+
         courses.append({
             "program": pc.parent,
             "course": pc.course,
-            "title": pc.course_title
+            "title": pc.course_title,
+            "is_enrolled": bool(enrollment),
+            # jika sudah enrolled → ambil lesson terakhir, fallback ke 1-1
+            "next_lesson": enrollment.current_lesson if enrollment and enrollment.current_lesson else "1-1"
         })
 
     return courses
@@ -2122,6 +2152,7 @@ def enroll_in_program_course(program, course):
         {
             "member": frappe.session.user,
             "course": course,
+            "due_date": add_days(getdate(), 30)
         }
     )
     enrollment.save()
