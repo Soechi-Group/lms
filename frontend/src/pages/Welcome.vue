@@ -68,13 +68,61 @@
 						class="flex items-center justify-between"
 					>
 						<div class="flex items-center gap-3">
-							<span class="w-3 h-3 rounded-full bg-blue-500"></span>
-							<span class="font-medium">{{ program.title }}</span>
+							<span
+								:class="[
+									'w-3 h-3 rounded-full',
+									program.is_completed
+										? 'bg-blue-500'
+										: program.is_overdue
+											? 'bg-red-500'
+											: program.is_enrolled
+												? 'bg-yellow-500'
+												: 'bg-yellow-500',
+								]"
+							></span>
+							<div>
+								<span class="font-medium">{{ program.title }}</span>
+								<p class="text-xs text-gray-500">
+									Due: {{ formatDate(program.due_date) }}
+								</p>
+							</div>
 						</div>
 
-						<div class="flex items-center gap-2">
-							<button class="px-3 py-1 text-sm text-white bg-blue-500 rounded">
+						<div v-if="!program.is_enrolled" class="flex items-center gap-2">
+							<span
+								v-if="program.is_overdue"
+								class="px-3 py-1 text-xs font-semibold text-white bg-red-500 rounded"
+							>
+								Overdue
+							</span>
+							<button
+								v-if="!program.is_completed"
+								class="px-3 py-1 text-sm text-white bg-blue-500 rounded"
+								@click="handleStart(program)"
+							>
 								Start
+							</button>
+						</div>
+						<div v-if="program.is_enrolled" class="flex items-center gap-2">
+							<span
+								v-if="program.is_overdue"
+								class="px-3 py-1 text-xs font-semibold text-white bg-red-500 rounded"
+							>
+								Overdue
+							</span>
+							<button
+								v-if="program.is_completed"
+								class="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded"
+								@click="handleResume(program)"
+							>
+								View
+							</button>
+							<button
+								v-if="!program.is_completed"
+								class="px-3 py-1 text-sm text-white bg-blue-500 rounded"
+								@click="handleResume(program)"
+							>
+								Resume
 							</button>
 						</div>
 					</li>
@@ -212,10 +260,24 @@
 import GreetingDesktopImg from '@/assets/greeting_desktop.png'
 import GreetingMobileImg from '@/assets/greeting_mobile.png'
 import { computed } from 'vue'
-import { createResource } from 'frappe-ui'
+import { createResource, call, toast } from 'frappe-ui'
 import { usersStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
 
 const { userResource } = usersStore()
+
+const router = useRouter()
+
+const formatDate = (dateStr) => {
+	if (!dateStr) return '-'
+
+	const date = new Date(dateStr)
+	const day = String(date.getDate()).padStart(2, '0')
+	const month = String(date.getMonth() + 1).padStart(2, '0')
+	const year = date.getFullYear()
+
+	return `${day}-${month}-${year}`
+}
 
 const crew_rank = computed(() => {
 	return userResource.data?.crew_rank || 'Guest'
@@ -224,6 +286,45 @@ const crew_rank = computed(() => {
 const user_type = computed(() => {
 	return String(userResource.data?.user_type || 'Guest').toLowerCase()
 })
+
+const handleStart = (program) => {
+	enrollMember(program.program, program.course)
+}
+
+const handleResume = (program) => {
+	enrollMember(program.program, program.course)
+}
+
+const enrollMember = (program, course) => {
+	call('lms.lms.utils.enroll_in_program_course', {
+		program: program,
+		course: course,
+	})
+		.then((data) => {
+			if (data.current_lesson) {
+				router.push({
+					name: 'Lesson',
+					params: {
+						courseName: course,
+						chapterNumber: data.current_lesson.split('-')[0],
+						lessonNumber: data.current_lesson.split('-')[1],
+					},
+				})
+			} else if (data) {
+				router.push({
+					name: 'Lesson',
+					params: {
+						courseName: course,
+						chapterNumber: 1,
+						lessonNumber: 1,
+					},
+				})
+			}
+		})
+		.catch((err) => {
+			toast.error(err.messages?.[0] || err)
+		})
+}
 
 const programs = createResource({
 	url: 'lms.lms.utils.get_mandatory_program_courses_by_user',

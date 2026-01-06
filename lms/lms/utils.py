@@ -1,3 +1,4 @@
+from frappe.utils import nowdate, getdate
 import hashlib
 import json
 import re
@@ -2039,8 +2040,8 @@ def get_programs():
 @frappe.whitelist()
 def get_mandatory_program_courses_by_user(crew_rank=None):
     user = frappe.session.user
+    today = getdate(nowdate())
 
-    # 1. Ambil program sesuai crew rank
     programs = frappe.get_all(
         "LMS Program",
         filters=[
@@ -2055,17 +2056,10 @@ def get_mandatory_program_courses_by_user(crew_rank=None):
 
     program_names = [p.name for p in programs]
 
-    # 2. Ambil program courses
     program_courses = frappe.get_all(
         "LMS Program Course",
-        filters={
-            "parent": ["in", program_names]
-        },
-        fields=[
-            "course",
-            "course_title",
-            "parent"
-        ],
+        filters={"parent": ["in", program_names]},
+        fields=["course", "course_title", "parent"],
         order_by="idx"
     )
 
@@ -2074,7 +2068,6 @@ def get_mandatory_program_courses_by_user(crew_rank=None):
 
     courses_list = [pc.course for pc in program_courses]
 
-    # 3. Ambil enrollment user (sekali query, penting!)
     enrollments = frappe.get_all(
         "LMS Enrollment",
         filters={
@@ -2083,27 +2076,39 @@ def get_mandatory_program_courses_by_user(crew_rank=None):
         },
         fields=[
             "course",
-            "current_lesson"
+            "current_lesson",
+            "due_date",
+            "progress"
         ]
     )
 
-    # Map: course -> enrollment
-    enrollment_map = {
-        e.course: e for e in enrollments
-    }
+    enrollment_map = {e.course: e for e in enrollments}
 
-    # 4. Build response
     courses = []
     for pc in program_courses:
         enrollment = enrollment_map.get(pc.course)
+
+        is_completed = bool(
+            enrollment and enrollment.progress == 100
+        )
+
+        is_overdue = False
+        if enrollment and enrollment.due_date and not is_completed:
+            is_overdue = getdate(enrollment.due_date) < today
 
         courses.append({
             "program": pc.parent,
             "course": pc.course,
             "title": pc.course_title,
             "is_enrolled": bool(enrollment),
-            # jika sudah enrolled → ambil lesson terakhir, fallback ke 1-1
-            "next_lesson": enrollment.current_lesson if enrollment and enrollment.current_lesson else "1-1"
+            "next_lesson": (
+                None if is_completed
+                else enrollment.current_lesson if enrollment and enrollment.current_lesson
+                else "1-1"
+            ),
+            "due_date": enrollment.due_date if enrollment else None,
+            "is_overdue": is_overdue,
+            "is_completed": is_completed
         })
 
     return courses
