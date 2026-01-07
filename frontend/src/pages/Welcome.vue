@@ -63,7 +63,7 @@
 
 				<ul class="space-y-4">
 					<li
-						v-for="program in programs.data"
+						v-for="program in mandatory.data"
 						:key="program.name"
 						class="flex items-center justify-between"
 					>
@@ -201,7 +201,20 @@
 				<h3 class="font-semibold text-lg mb-4">Non-Mandatory Training</h3>
 
 				<ul class="space-y-4">
-					<li class="flex justify-between items-center">
+					<li
+						v-for="program in nonMandatory.data"
+						:key="program.name"
+						class="flex justify-between items-center"
+					>
+						{{ program.title }}
+						<button
+							class="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded"
+							@click="handleEnroll(program)"
+						>
+							Enroll
+						</button>
+					</li>
+					<!-- <li class="flex justify-between items-center">
 						Leadership at Sea
 						<button
 							class="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded"
@@ -226,13 +239,19 @@
 						>
 							Enroll
 						</button>
-					</li>
+					</li> -->
 				</ul>
 
-				<div class="mt-6 text-center">
-					<button class="px-4 py-2 text-sm border rounded text-gray-700">
+				<div v-if="nonMandatory.data.length > 0" class="mt-6 text-center">
+					<a
+						href="/lms/programs"
+						class="px-4 py-2 text-sm border rounded text-gray-700"
+					>
 						Browse Full Library
-					</button>
+					</a>
+				</div>
+				<div v-else class="mt-20 text-center text-gray-500">
+					No courses available.
 				</div>
 			</div>
 		</div>
@@ -287,6 +306,10 @@ const user_type = computed(() => {
 	return String(userResource.data?.user_type || 'Guest').toLowerCase()
 })
 
+const handleEnroll = (program) => {
+	enrollMember(program.program, program.course)
+}
+
 const handleStart = (program) => {
 	enrollMember(program.program, program.course)
 }
@@ -326,7 +349,20 @@ const enrollMember = (program, course) => {
 		})
 }
 
-const programs = createResource({
+const nonMandatory = createResource({
+	url: 'lms.lms.utils.get_non_mandatory_courses_by_user',
+	auto: true,
+	makeParams() {
+		return {
+			crew_rank: crew_rank.value,
+		}
+	},
+	onSuccess(data) {
+		console.log('Non Mandatory Data:', data)
+	},
+})
+
+const mandatory = createResource({
 	url: 'lms.lms.utils.get_mandatory_program_courses_by_user',
 	auto: true,
 	makeParams() {
@@ -335,7 +371,7 @@ const programs = createResource({
 		}
 	},
 	onSuccess(data) {
-		console.log('Crew Rank Data:', data)
+		console.log('Mandatory Data:', data)
 	},
 })
 </script>

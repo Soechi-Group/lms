@@ -2115,6 +2115,64 @@ def get_mandatory_program_courses_by_user(crew_rank=None):
 
 
 @frappe.whitelist()
+def get_non_mandatory_courses_by_user(crew_rank=None):
+    """
+    Ambil course NON-mandatory berdasarkan crew rank.
+    Non-mandatory = course yang tidak terdaftar di LMS Program
+    yang ter-filter oleh crew rank.
+    """
+
+    # 1. Ambil program mandatory berdasarkan crew rank
+    programs = frappe.get_all(
+        "LMS Program",
+        filters=[
+            ["LMS Crew Rank", "crew_name", "=", crew_rank]
+        ],
+        fields=["name"],
+        distinct=True
+    )
+
+    program_names = [p.name for p in programs]
+
+    # 2. Ambil course yang ada di program mandatory
+    mandatory_courses = set()
+    if program_names:
+        program_courses = frappe.get_all(
+            "LMS Program Course",
+            filters={
+                "parent": ["in", program_names]
+            },
+            fields=["course"]
+        )
+        mandatory_courses = {pc.course for pc in program_courses}
+
+    # 3. Ambil semua course
+    all_courses = frappe.get_all(
+        "LMS Course",
+        fields=[
+            "name",
+            "title",
+            "image",
+            "short_introduction"
+        ],
+        order_by="title"
+    )
+
+    # 4. Filter non-mandatory
+    non_mandatory_courses = []
+    for course in all_courses:
+        if course.name not in mandatory_courses:
+            non_mandatory_courses.append({
+                "course": course.name,
+                "title": course.title,
+                "image": course.image,
+                "description": course.short_introduction
+            })
+
+    return non_mandatory_courses
+
+
+@frappe.whitelist()
 def enroll_in_program_course(program, course):
     enrollment = frappe.db.exists(
         "LMS Enrollment", {"member": frappe.session.user, "course": course})
