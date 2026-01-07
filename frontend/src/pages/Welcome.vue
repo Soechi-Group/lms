@@ -20,7 +20,7 @@
 			<span
 				class="px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg"
 			>
-				2 Courses Overdue!
+				{{ summary.data.overdue }} Courses Overdue!
 			</span>
 		</div>
 
@@ -29,29 +29,34 @@
 			<!-- Mandatory Progress -->
 			<div class="bg-white rounded-xl shadow p-4">
 				<p class="text-sm text-gray-500">Mandatory Progress</p>
-				<p class="text-3xl font-bold mt-2">65%</p>
+				<p class="text-3xl font-bold mt-2">
+					{{ summary.data?.percentage ?? 0 }}%
+				</p>
 
 				<div class="w-full bg-gray-200 rounded-full h-2 mt-3">
-					<div class="bg-green-500 h-2 rounded-full" style="width: 65%"></div>
+					<div
+						class="bg-green-500 h-2 rounded-full"
+						:style="{ width: `${summary.data?.percentage || 0}%` }"
+					></div>
 				</div>
 			</div>
 
 			<!-- Overdue -->
 			<div class="bg-white rounded-xl shadow p-4 border-l-4 border-red-500">
 				<p class="text-sm text-gray-500">Overdue Courses</p>
-				<p class="text-3xl font-bold mt-2">2</p>
+				<p class="text-3xl font-bold mt-2">{{ summary.data.overdue }}</p>
 			</div>
 
 			<!-- In Progress -->
 			<div class="bg-white rounded-xl shadow p-4 border-l-4 border-orange-400">
 				<p class="text-sm text-gray-500">In Progress</p>
-				<p class="text-3xl font-bold mt-2">2</p>
+				<p class="text-3xl font-bold mt-2">{{ summary.data.in_progress }}</p>
 			</div>
 
 			<!-- Completed -->
 			<div class="bg-white rounded-xl shadow p-4 border-l-4 border-green-500">
 				<p class="text-sm text-gray-500">Completed</p>
-				<p class="text-3xl font-bold mt-2">12</p>
+				<p class="text-3xl font-bold mt-2">{{ summary.data.completed }}</p>
 			</div>
 		</div>
 
@@ -127,73 +132,6 @@
 						</div>
 					</li>
 				</ul>
-				<!-- <ul class="space-y-4">
-					<li class="flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<span class="w-3 h-3 rounded-full bg-red-500"></span>
-							<span class="font-medium">Fire Safety Refresher</span>
-						</div>
-
-						<div class="flex items-center gap-2">
-							<span
-								class="px-3 py-1 text-xs font-semibold text-white bg-red-500 rounded"
-							>
-								Overdue
-							</span>
-							<button class="px-3 py-1 text-sm text-white bg-blue-500 rounded">
-								Resume
-							</button>
-						</div>
-					</li>
-
-					<li class="flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<span class="w-3 h-3 rounded-full bg-red-500"></span>
-							<span class="font-medium">New Environmental Regulations</span>
-						</div>
-
-						<div class="flex items-center gap-2">
-							<span
-								class="px-3 py-1 text-xs font-semibold text-white bg-red-500 rounded"
-							>
-								Overdue
-							</span>
-							<button class="px-3 py-1 text-sm text-white bg-blue-500 rounded">
-								Start
-							</button>
-						</div>
-					</li>
-
-					<li class="flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<span class="w-3 h-3 rounded-full bg-orange-400"></span>
-							<div>
-								<p class="font-medium">Advanced First Aid</p>
-								<p class="text-xs text-gray-500">Due: 30-Nov-2023</p>
-							</div>
-						</div>
-
-						<button class="px-3 py-1 text-sm text-white bg-blue-500 rounded">
-							Resume
-						</button>
-					</li>
-
-					<li class="flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<span class="w-3 h-3 rounded-full bg-blue-500"></span>
-							<div>
-								<p class="font-medium">Vessel Security Training</p>
-								<p class="text-xs text-gray-500">Due: 15-Dec-2023</p>
-							</div>
-						</div>
-
-						<button
-							class="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded"
-						>
-							View
-						</button>
-					</li>
-				</ul> -->
 			</div>
 
 			<!-- Non Mandatory -->
@@ -214,32 +152,6 @@
 							Enroll
 						</button>
 					</li>
-					<!-- <li class="flex justify-between items-center">
-						Leadership at Sea
-						<button
-							class="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded"
-						>
-							Enroll
-						</button>
-					</li>
-
-					<li class="flex justify-between items-center">
-						Efficient Cargo Handling
-						<button
-							class="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded"
-						>
-							Enroll
-						</button>
-					</li>
-
-					<li class="flex justify-between items-center">
-						Basic Engine Room Troubleshooting
-						<button
-							class="px-3 py-1 text-sm border border-blue-500 text-blue-500 rounded"
-						>
-							Enroll
-						</button>
-					</li> -->
 				</ul>
 
 				<div v-if="nonMandatory.data.length > 0" class="mt-6 text-center">
@@ -372,6 +284,19 @@ const mandatory = createResource({
 	},
 	onSuccess(data) {
 		console.log('Mandatory Data:', data)
+	},
+})
+
+const summary = createResource({
+	url: 'lms.lms.utils.get_course_summary_by_crew_rank',
+	auto: true,
+	makeParams() {
+		return {
+			crew_rank: crew_rank.value,
+		}
+	},
+	onSuccess(data) {
+		console.log('Summary Data:', data)
 	},
 })
 </script>

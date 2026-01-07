@@ -2173,6 +2173,99 @@ def get_non_mandatory_courses_by_user(crew_rank=None):
 
 
 @frappe.whitelist()
+def get_course_summary_by_crew_rank(crew_rank=None):
+    user = frappe.session.user
+    today = getdate(nowdate())
+
+    # 1. Ambil program mandatory berdasarkan crew rank
+    programs = frappe.get_all(
+        "LMS Program",
+        filters=[
+            ["LMS Crew Rank", "crew_name", "=", crew_rank]
+        ],
+        fields=["name"],
+        distinct=True
+    )
+
+    if not programs:
+        return {
+            "overdue": 0,
+            "in_progress": 0,
+            "completed": 0,
+            "percentage": 0,
+        }
+
+    program_names = [p.name for p in programs]
+
+    # 2. Ambil course dari program
+    program_courses = frappe.get_all(
+        "LMS Program Course",
+        filters={"parent": ["in", program_names]},
+        fields=["course"]
+    )
+
+    if not program_courses:
+        return {
+            "overdue": 0,
+            "in_progress": 0,
+            "completed": 0,
+            "percentage": 0,
+        }
+
+    courses_list = [pc.course for pc in program_courses]
+
+    # 3. Ambil enrollment user
+    enrollments = frappe.get_all(
+        "LMS Enrollment",
+        filters={
+            "member": user,
+            "course": ["in", courses_list]
+        },
+        fields=[
+            "course",
+            "due_date",
+            "progress"
+        ]
+    )
+
+    enrollment_map = {e.course: e for e in enrollments}
+
+    overdue = 0
+    in_progress = 0
+    completed = 0
+    percentage = 0
+
+    # 4. Hitung summary
+    for course in courses_list:
+        enrollment = enrollment_map.get(course)
+
+        # belum enroll → dianggap in progress
+        if not enrollment:
+            continue
+
+        if enrollment.progress == 100:
+            completed += 1
+            continue
+
+        if enrollment.due_date and getdate(enrollment.due_date) < today:
+            overdue += 1
+        else:
+            in_progress += 1
+
+    total_courses = len(program_courses)
+    started_courses = len({e.course for e in enrollments})
+
+    percentage = round((started_courses / total_courses) * 100, 2)
+
+    return {
+        "overdue": overdue,
+        "in_progress": in_progress,
+        "completed": completed,
+        "percentage": percentage
+    }
+
+
+@frappe.whitelist()
 def enroll_in_program_course(program, course):
     enrollment = frappe.db.exists(
         "LMS Enrollment", {"member": frappe.session.user, "course": course})
