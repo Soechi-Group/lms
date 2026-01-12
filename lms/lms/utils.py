@@ -2038,6 +2038,64 @@ def get_programs():
 
 
 @frappe.whitelist()
+def get_all_user_courses_enrollment():
+    user = frappe.session.user
+
+    enrollments = frappe.get_all(
+        "LMS Enrollment",
+        filters={
+            "member": user
+        },
+        fields=[
+            "course",
+            "progress",
+            "creation",
+            "modified",
+            "current_lesson",
+            "due_date"
+        ],
+        order_by="creation asc"
+    )
+
+    if not enrollments:
+        return []
+
+    # 🔑 Ambil title course SEKALI saja
+    course_names = list({e.course for e in enrollments})
+
+    courses = frappe.get_all(
+        "LMS Course",
+        filters={"name": ["in", course_names]},
+        fields=["name", "title"]
+    )
+
+    course_title_map = {
+        c.name: c.title for c in courses
+    }
+
+    result = []
+
+    for e in enrollments:
+        is_completed = e.progress == 100
+
+        result.append({
+            "course": e.course,
+            "course_title": course_title_map.get(e.course, e.course),
+            "started_at": e.creation,
+            "completed_at": e.modified if is_completed else None,
+            "progress": e.progress,
+            "current_lesson": e.current_lesson,
+            "due_date": e.due_date,
+            "status": (
+                "completed" if is_completed
+                else "in_progress"
+            )
+        })
+
+    return result
+
+
+@frappe.whitelist()
 def get_mandatory_program_courses_by_user(crew_rank=None):
     user = frappe.session.user
     today = getdate(nowdate())
@@ -2066,7 +2124,13 @@ def get_mandatory_program_courses_by_user(crew_rank=None):
     if not program_courses:
         return []
 
-    courses_list = [pc.course for pc in program_courses]
+    # 🔑 COURSE UNIK
+    unique_courses = {}
+    for pc in program_courses:
+        if pc.course not in unique_courses:
+            unique_courses[pc.course] = pc
+
+    courses_list = list(unique_courses.keys())
 
     enrollments = frappe.get_all(
         "LMS Enrollment",
@@ -2085,25 +2149,25 @@ def get_mandatory_program_courses_by_user(crew_rank=None):
     enrollment_map = {e.course: e for e in enrollments}
 
     courses = []
-    for pc in program_courses:
-        enrollment = enrollment_map.get(pc.course)
+    for course, pc in unique_courses.items():
+        enrollment = enrollment_map.get(course)
 
-        is_completed = bool(
-            enrollment and enrollment.progress == 100
-        )
+        is_completed = bool(enrollment and enrollment.progress == 100)
 
         is_overdue = False
         if enrollment and enrollment.due_date and not is_completed:
             is_overdue = getdate(enrollment.due_date) < today
 
         courses.append({
+            # ⛔ program tidak relevan lagi untuk unique view
             "program": pc.parent,
-            "course": pc.course,
+            "course": course,
             "title": pc.course_title,
             "is_enrolled": bool(enrollment),
             "next_lesson": (
                 None if is_completed
-                else enrollment.current_lesson if enrollment and enrollment.current_lesson
+                else enrollment.current_lesson
+                if enrollment and enrollment.current_lesson
                 else "1-1"
             ),
             "due_date": enrollment.due_date if enrollment else None,
@@ -2177,27 +2241,18 @@ def get_course_summary_by_crew_rank(crew_rank=None):
     user = frappe.session.user
     today = getdate(nowdate())
 
-    # 1. Ambil program mandatory berdasarkan crew rank
     programs = frappe.get_all(
         "LMS Program",
-        filters=[
-            ["LMS Crew Rank", "crew_name", "=", crew_rank]
-        ],
+        filters=[["LMS Crew Rank", "crew_name", "=", crew_rank]],
         fields=["name"],
         distinct=True
     )
 
     if not programs:
-        return {
-            "overdue": 0,
-            "in_progress": 0,
-            "completed": 0,
-            "percentage": 0,
-        }
+        return {"overdue": 0, "in_progress": 0, "completed": 0, "percentage": 0}
 
     program_names = [p.name for p in programs]
 
-    # 2. Ambil course dari program
     program_courses = frappe.get_all(
         "LMS Program Course",
         filters={"parent": ["in", program_names]},
@@ -2205,27 +2260,18 @@ def get_course_summary_by_crew_rank(crew_rank=None):
     )
 
     if not program_courses:
-        return {
-            "overdue": 0,
-            "in_progress": 0,
-            "completed": 0,
-            "percentage": 0,
-        }
+        return {"overdue": 0, "in_progress": 0, "completed": 0, "percentage": 0}
 
-    courses_list = [pc.course for pc in program_courses]
+    # ✅ COURSE UNIK
+    unique_courses = set(pc.course for pc in program_courses)
 
-    # 3. Ambil enrollment user
     enrollments = frappe.get_all(
         "LMS Enrollment",
         filters={
             "member": user,
-            "course": ["in", courses_list]
+            "course": ["in", list(unique_courses)]
         },
-        fields=[
-            "course",
-            "due_date",
-            "progress"
-        ]
+        fields=["course", "due_date", "progress"]
     )
 
     enrollment_map = {e.course: e for e in enrollments}
@@ -2233,13 +2279,10 @@ def get_course_summary_by_crew_rank(crew_rank=None):
     overdue = 0
     in_progress = 0
     completed = 0
-    percentage = 0
 
-    # 4. Hitung summary
-    for course in courses_list:
+    for course in unique_courses:
         enrollment = enrollment_map.get(course)
 
-        # belum enroll → dianggap in progress
         if not enrollment:
             continue
 
@@ -2252,10 +2295,13 @@ def get_course_summary_by_crew_rank(crew_rank=None):
         else:
             in_progress += 1
 
-    total_courses = len(program_courses)
-    started_courses = len({e.course for e in enrollments})
+    total_courses = len(unique_courses)
+    completed_courses = len({
+        e.course for e in enrollments if e.progress == 100
+    })
 
-    percentage = round((started_courses / total_courses) * 100, 2)
+    percentage = round((completed_courses / total_courses)
+                       * 100, 2) if total_courses else 0
 
     return {
         "overdue": overdue,

@@ -172,17 +172,17 @@
 		<div class="bg-white rounded-xl shadow p-5">
 			<h3 class="font-semibold text-lg mb-4">Recent Activity</h3>
 
-			<ul class="space-y-2 text-sm">
-				<li class="text-green-600">
-					✔ Today: Completed "Conflict Resolution"
-				</li>
-				<li class="text-orange-500">
-					⚠ Yesterday: Reminder sent for "Fire Safety Refresher"
-				</li>
-				<li class="text-blue-500">
-					▶ Last Week: Started "Advanced First Aid"
+			<ul v-if="recentActivities.length" class="space-y-2 text-sm">
+				<li
+					v-for="(activity, index) in recentActivities"
+					:key="index"
+					:class="activity.color"
+				>
+					{{ activity.icon }} {{ activity.label }}
 				</li>
 			</ul>
+
+			<div v-else class="text-gray-500 text-sm">No recent activity.</div>
 		</div>
 	</div>
 </template>
@@ -198,6 +198,56 @@ import { useRouter } from 'vue-router'
 const { userResource } = usersStore()
 
 const router = useRouter()
+
+const getRelativeDayLabel = (dateStr) => {
+	if (!dateStr) return ''
+
+	const date = new Date(dateStr)
+	const today = new Date()
+
+	const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24))
+
+	if (diffDays === 0) return 'Today'
+	if (diffDays === 1) return 'Yesterday'
+	if (diffDays <= 7) return 'Last Week'
+	return date.toLocaleDateString()
+}
+
+const recentActivities = computed(() => {
+	if (!activityLog.data) return []
+
+	const activities = []
+
+	activityLog.data.forEach((item) => {
+		// ✅ Completed
+		if (item.completed_at) {
+			activities.push({
+				type: 'completed',
+				color: 'text-green-600',
+				icon: '✔',
+				label: `${getRelativeDayLabel(item.completed_at)}: Completed "${item.course_title}"`,
+				date: item.completed_at,
+			})
+			return
+		}
+
+		// ▶ Started
+		if (item.started_at) {
+			activities.push({
+				type: 'started',
+				color: 'text-blue-500',
+				icon: '▶',
+				label: `${getRelativeDayLabel(item.started_at)}: Started "${item.course_title}"`,
+				date: item.started_at,
+			})
+		}
+	})
+
+	// sort by latest activity
+	return activities
+		.sort((a, b) => new Date(b.date) - new Date(a.date))
+		.slice(0, 5) // tampilkan max 5 activity
+})
 
 const formatDate = (dateStr) => {
 	if (!dateStr) return '-'
@@ -297,6 +347,14 @@ const summary = createResource({
 	},
 	onSuccess(data) {
 		console.log('Summary Data:', data)
+	},
+})
+
+const activityLog = createResource({
+	url: 'lms.lms.utils.get_all_user_courses_enrollment',
+	auto: true,
+	onSuccess(data) {
+		console.log('Activity Log Data:', data)
 	},
 })
 </script>
