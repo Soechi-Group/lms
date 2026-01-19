@@ -59,12 +59,9 @@ export default defineConfig({
 			},
 		}),
 	],
-	// server: {
-	// 	host: '0.0.0.0', // Accept connections from any network interface
-	// 	allowedHosts: ['ps', 'fs'], // Explicitly allow this host
-	// },
 	server: {
-		allowedHosts: true,
+		host: '0.0.0.0', // Accept connections from any network interface
+		allowedHosts: ['ps', 'fs'], // Explicitly allow this host
 	},
 	resolve: {
 		alias: {

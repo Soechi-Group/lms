@@ -185,6 +185,177 @@
 			<div v-else class="text-gray-500 text-sm">No recent activity.</div>
 		</div>
 	</div>
+
+	<div
+		v-if="String(crew_rank).toLowerCase() === 'master'"
+		class="p-6 space-y-6 bg-gray-50"
+	>
+		<!-- Header -->
+		<div class="flex justify-between items-center p-6">
+			<h1 class="text-2xl font-bold text-gray-800">
+				Vessel Training Compliance - Pacific Explorer
+			</h1>
+			<button
+				class="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700"
+			>
+				Generate Report
+			</button>
+		</div>
+
+		<!-- KPI Cards -->
+		<div class="grid grid-cols-1 md:grid-cols-4 gap-4 px-6">
+			<div class="bg-white rounded-xl p-6 border-l-4 border-blue-500 shadow">
+				<p class="text-gray-500 text-sm">Overall Compliance</p>
+				<p class="text-3xl font-bold mt-2">78%</p>
+			</div>
+
+			<div class="bg-white rounded-xl p-6 border-l-4 border-red-500 shadow">
+				<p class="text-gray-500 text-sm">Courses At Risk</p>
+				<p class="text-3xl font-bold mt-2">5</p>
+			</div>
+
+			<div class="bg-white rounded-xl p-6 border-l-4 border-yellow-500 shadow">
+				<p class="text-gray-500 text-sm">Crew with Overdue Training</p>
+				<p class="text-3xl font-bold mt-2">3</p>
+			</div>
+
+			<div class="bg-white rounded-xl p-6 border-l-4 border-blue-400 shadow">
+				<p class="text-gray-500 text-sm">Pending Non-Mandatory</p>
+				<p class="text-3xl font-bold mt-2">15</p>
+			</div>
+		</div>
+
+		<!-- Middle Section -->
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+			<!-- Compliance by Course -->
+			<div class="bg-white rounded-xl shadow p-6">
+				<h2 class="text-lg font-semibold mb-4">Compliance by Course</h2>
+
+				<div class="space-y-3">
+					<div class="flex justify-between border-b pb-2">
+						<span>Course A: Safety Procedures</span>
+						<span class="font-semibold">100%</span>
+					</div>
+					<div class="flex justify-between border-b pb-2">
+						<span>Course B: Emergency Response</span>
+						<span class="font-semibold">95%</span>
+					</div>
+					<div class="flex justify-between border-b pb-2 text-red-600">
+						<span>Course C: Environmental Regulations</span>
+						<span class="font-semibold">45%</span>
+					</div>
+					<div class="flex justify-between">
+						<span>Course D: Navigation Safety</span>
+						<span class="font-semibold">88%</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- Reminder Escalation Status -->
+			<div class="bg-white rounded-xl shadow p-6">
+				<h2 class="text-lg font-semibold mb-4">Reminder Escalation Status</h2>
+
+				<div class="space-y-4">
+					<div class="border-b pb-3">
+						<span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded"
+							>Stage 3</span
+						>
+						<p class="font-medium mt-1">Fire Safety - Mike Jones</p>
+						<p class="text-sm text-gray-500">Manager Alert Sent (SMS)</p>
+					</div>
+
+					<div class="border-b pb-3">
+						<span
+							class="bg-yellow-100 text-yellow-600 text-xs px-2 py-1 rounded"
+							>Stage 2</span
+						>
+						<p class="font-medium mt-1">Environmental Regs - Jane Smith</p>
+						<p class="text-sm text-gray-500">Formal Reminder Sent</p>
+					</div>
+
+					<div>
+						<span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded"
+							>Stage 1</span
+						>
+						<p class="font-medium mt-1">Security Training - 5 crew members</p>
+						<p class="text-sm text-gray-500">Initial Notification Sent</p>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Crew Training Status Table -->
+		<div class="px-6 pb-8">
+			<div class="bg-white rounded-xl shadow p-6">
+				<h2 class="text-lg font-semibold mb-4">Crew Training Status</h2>
+
+				<table class="w-full border-collapse">
+					<thead>
+						<tr class="bg-gray-100 text-left">
+							<th class="p-3 text-sm">Name</th>
+							<th class="p-3 text-sm">Mandatory %</th>
+							<th class="p-3 text-sm">Status</th>
+							<th class="p-3 text-sm">Alerts</th>
+							<th class="p-3 text-sm">Action</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr class="border-t">
+							<td class="p-3">John Doe</td>
+							<td class="p-3">100%</td>
+							<td class="p-3 text-green-600">Compliant</td>
+							<td class="p-3">None</td>
+							<td class="p-3">
+								<button
+									class="border border-blue-500 text-blue-500 px-3 py-1 rounded"
+								>
+									View
+								</button>
+							</td>
+						</tr>
+
+						<tr class="border-t">
+							<td class="p-3">Jane Smith</td>
+							<td class="p-3">45%</td>
+							<td class="p-3 text-red-600">At Risk</td>
+							<td class="p-3">2 Overdue</td>
+							<td class="p-3">
+								<button class="bg-red-500 text-white px-3 py-1 rounded">
+									Send Reminder
+								</button>
+							</td>
+						</tr>
+
+						<tr class="border-t">
+							<td class="p-3">Mike Jones</td>
+							<td class="p-3">60%</td>
+							<td class="p-3 text-red-600">Non-Compliant</td>
+							<td class="p-3">1 Overdue</td>
+							<td class="p-3">
+								<button class="bg-red-500 text-white px-3 py-1 rounded">
+									Send Reminder
+								</button>
+							</td>
+						</tr>
+
+						<tr class="border-t">
+							<td class="p-3">Anna Kyle</td>
+							<td class="p-3">95%</td>
+							<td class="p-3 text-green-600">Compliant</td>
+							<td class="p-3">Due Soon (1)</td>
+							<td class="p-3">
+								<button
+									class="border border-blue-500 text-blue-500 px-3 py-1 rounded"
+								>
+									View
+								</button>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
 </template>
 
 <script setup>
