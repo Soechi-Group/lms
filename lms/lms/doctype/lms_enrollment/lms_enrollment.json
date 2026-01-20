@@ -10,6 +10,7 @@
   "progress",
   "payment",
   "current_lesson",
+  "due_date",
   "column_break_3",
   "member",
   "member_name",
@@ -150,12 +151,17 @@
    "fieldname": "member_image",
    "fieldtype": "Attach Image",
    "label": "Member Image"
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-07-02 21:27:30.733482",
+ "modified": "2026-01-02 14:30:16.576646",
  "modified_by": "Administrator",
  "module": "LMS",
  "name": "LMS Enrollment",
