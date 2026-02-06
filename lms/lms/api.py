@@ -154,6 +154,7 @@ def get_user_info():
     )
 
     crew_rank = frappe.get_cached_value("User", user.name, "crew_rank")
+    crew_vessel = frappe.get_cached_value("User", user.name, "vessel")
 
     user["roles"] = frappe.get_roles(user.name)
     user.is_instructor = "Course Creator" in user.roles
@@ -167,6 +168,10 @@ def get_user_info():
     if crew_rank:
         user.crew_rank = frappe.get_cached_value(
             "Crew Rank", crew_rank, "rank_name"
+        )
+    if crew_vessel:
+        user.vessel = frappe.get_cached_value(
+            "LMS Vessel", crew_vessel, "vessel_name"
         )
     if user.is_fc_site and user.is_system_manager:
         user.site_info = current_site_info()

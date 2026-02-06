@@ -1,3 +1,4 @@
+from frappe.utils import getdate, nowdate, add_days
 from frappe.utils import nowdate, getdate
 import hashlib
 import json
@@ -2035,6 +2036,745 @@ def get_programs():
             "LMS Program Member", {"parent": program.name})
 
     return programs
+
+
+@frappe.whitelist()
+def get_compliance_by_course(crew_vessel):
+    today = getdate(nowdate())
+
+    # ===============================
+    # 1️⃣ Vessel
+    # ===============================
+    vessel_id = frappe.db.get_value(
+        "LMS Vessel",
+        {"vessel_name": crew_vessel},
+        "name"
+    )
+
+    if not vessel_id:
+        return {"vessel": crew_vessel, "courses": []}
+
+    # ===============================
+    # 2️⃣ Crew (User)
+    # ===============================
+    users = frappe.get_all(
+        "User",
+        filters={
+            "vessel": vessel_id,
+            "enabled": 1
+        },
+        fields=["name"]
+    )
+
+    user_ids = [u.name for u in users]
+
+    if not user_ids:
+        return {"vessel": crew_vessel, "courses": []}
+
+    # ===============================
+    # 3️⃣ Program Member (MANDATORY SOURCE)
+    # ===============================
+    program_members = frappe.get_all(
+        "LMS Program Member",
+        filters={
+            "member": ["in", user_ids]
+        },
+        fields=["member", "parent"]
+    )
+
+    if not program_members:
+        return {"vessel": crew_vessel, "courses": []}
+
+    # mapping program → members
+    program_member_map = {}
+    for pm in program_members:
+        program_member_map.setdefault(pm.parent, set()).add(pm.member)
+
+    program_names = list(program_member_map.keys())
+
+    # ===============================
+    # 4️⃣ Program Courses
+    # ===============================
+    program_courses = frappe.get_all(
+        "LMS Program Course",
+        filters={"parent": ["in", program_names]},
+        fields=["parent", "course", "course_title"]
+    )
+
+    # course → required members
+    course_required_map = {}
+
+    for pc in program_courses:
+        members = program_member_map.get(pc.parent, set())
+        course_required_map.setdefault(
+            pc.course,
+            {
+                "course_title": pc.course_title,
+                "required_members": set()
+            }
+        )
+        course_required_map[pc.course]["required_members"].update(members)
+
+    # ===============================
+    # 5️⃣ Enrollment
+    # ===============================
+    enrollments = frappe.get_all(
+        "LMS Enrollment",
+        filters={
+            "member": ["in", user_ids],
+            "course": ["in", list(course_required_map.keys())]
+        },
+        fields=["member", "course", "progress", "due_date"]
+    )
+
+    enrollment_map = {}
+    for e in enrollments:
+        enrollment_map[(e.course, e.member)] = e
+
+    # ===============================
+    # 6️⃣ Compliance Calculation
+    # ===============================
+    result = []
+
+    for course, data in course_required_map.items():
+        completed = 0
+        in_progress = 0
+        overdue = 0
+
+        for member in data["required_members"]:
+            enrollment = enrollment_map.get((course, member))
+
+            if enrollment:
+                if enrollment.progress == 100:
+                    completed += 1
+                else:
+                    if enrollment.due_date and getdate(enrollment.due_date) < today:
+                        overdue += 1
+                    else:
+                        in_progress += 1
+            else:
+                # mandatory tapi belum enroll
+                in_progress += 1
+
+        total_required = len(data["required_members"])
+
+        compliance_percentage = round(
+            (completed / total_required) * 100, 0
+        ) if total_required else 0
+
+        result.append({
+            "course": course,
+            "course_title": data["course_title"],
+            "completed": completed,
+            "in_progress": in_progress,
+            "overdue": overdue,
+            "total_required": total_required,
+            "compliance_percentage": compliance_percentage
+        })
+
+    return {
+        "vessel": crew_vessel,
+        "courses": result
+    }
+
+
+@frappe.whitelist()
+def get_fleet_management_summary():
+    today = getdate(nowdate())
+
+    # ==================================================
+    # 1️⃣ Mandatory Courses (SOURCE OF TRUTH)
+    # ==================================================
+    program_courses = frappe.get_all(
+        "LMS Program Course",
+        fields=["course"]
+    )
+
+    mandatory_courses = list(set(pc.course for pc in program_courses))
+
+    if not mandatory_courses:
+        return {
+            "fleet_compliance": 0,
+            "vessels_above_95": 0,
+            "total_overdue": 0,
+            "avg_non_mandatory_per_user": 0,
+        }
+
+    # ==================================================
+    # 2️⃣ Semua Vessel
+    # ==================================================
+    vessels = frappe.get_all(
+        "LMS Vessel",
+        fields=["name"]
+    )
+
+    vessel_names = [v.name for v in vessels]
+
+    # ==================================================
+    # 3️⃣ Semua User Aktif
+    # ==================================================
+    users = frappe.get_all(
+        "User",
+        filters={"enabled": 1},
+        fields=["name", "vessel"]
+    )
+
+    users_by_vessel = {}
+    for u in users:
+        if u.vessel:
+            users_by_vessel.setdefault(u.vessel, []).append(u.name)
+
+    total_users = len(users)
+
+    # ==================================================
+    # 4️⃣ Ambil SEMUA enrollment
+    # ==================================================
+    enrollments = frappe.get_all(
+        "LMS Enrollment",
+        fields=["member", "course", "progress", "due_date"]
+    )
+
+    # ==================================================
+    # 5️⃣ HITUNG per Vessel
+    # ==================================================
+    vessel_compliances = []
+    vessels_above_95 = 0
+    total_overdue = 0
+
+    for vessel in vessel_names:
+        vessel_users = users_by_vessel.get(vessel, [])
+
+        if not vessel_users:
+            continue
+
+        total_mandatory = 0
+        completed_mandatory = 0
+
+        for e in enrollments:
+            if e.member not in vessel_users:
+                continue
+
+            if e.course in mandatory_courses:
+                total_mandatory += 1
+
+                if e.progress == 100:
+                    completed_mandatory += 1
+                elif e.due_date and getdate(e.due_date) < today:
+                    total_overdue += 1
+
+        if total_mandatory == 0:
+            compliance = 100
+        else:
+            compliance = round((completed_mandatory / total_mandatory) * 100)
+
+        vessel_compliances.append(compliance)
+
+        if compliance >= 95:
+            vessels_above_95 += 1
+
+    # ==================================================
+    # 6️⃣ Fleet Compliance (AVG per Vessel)
+    # ==================================================
+    fleet_compliance = (
+        round(sum(vessel_compliances) / len(vessel_compliances))
+        if vessel_compliances else 0
+    )
+
+    # ==================================================
+    # 7️⃣ NON-MANDATORY SUMMARY
+    # ==================================================
+    non_mandatory_pending = 0
+
+    for e in enrollments:
+        if e.course not in mandatory_courses and e.progress < 100:
+            non_mandatory_pending += 1
+
+    avg_non_mandatory = (
+        round(non_mandatory_pending / total_users, 2)
+        if total_users else 0
+    )
+
+    # ==================================================
+    # 8️⃣ RESPONSE
+    # ==================================================
+    return {
+        "fleet_compliance": fleet_compliance,
+        "vessels_above_95": vessels_above_95,
+        "total_overdue": total_overdue,
+        "avg_non_mandatory_per_user": avg_non_mandatory,
+    }
+
+
+@frappe.whitelist()
+def get_vessel_comparison():
+
+    # ===============================
+    # 1️⃣ Ambil SEMUA VESSEL
+    # ===============================
+    vessels = frappe.get_all(
+        "LMS Vessel",
+        fields=["name", "vessel_name"]
+    )
+
+    if not vessels:
+        return {"vessels": []}
+
+    # ===============================
+    # 2️⃣ Ambil PROGRAM (MANDATORY)
+    # ===============================
+    programs = frappe.get_all(
+        "LMS Program",
+        fields=["name"]
+    )
+
+    program_names = [p.name for p in programs]
+
+    if not program_names:
+        return {"vessels": []}
+
+    # ===============================
+    # 3️⃣ Ambil COURSE dari PROGRAM
+    # ===============================
+    program_courses = frappe.get_all(
+        "LMS Program Course",
+        filters={"parent": ["in", program_names]},
+        fields=["course"]
+    )
+
+    mandatory_courses = list(set(pc.course for pc in program_courses))
+    total_mandatory = len(mandatory_courses)
+
+    if total_mandatory == 0:
+        return {"vessels": []}
+
+    result = []
+
+    # ===============================
+    # 4️⃣ LOOP PER VESSEL
+    # ===============================
+    for vessel in vessels:
+        # Ambil crew dari User
+        users = frappe.get_all(
+            "User",
+            filters={
+                "vessel": vessel.name,
+                "enabled": 1
+            },
+            fields=["name"]
+        )
+
+        total_crew = len(users)
+
+        if total_crew == 0:
+            result.append({
+                "vessel": vessel.vessel_name,
+                "total_crew": 0,
+                "compliant": 0,
+                "non_compliant": 0,
+                "compliance_percentage": 0
+            })
+            continue
+
+        user_ids = [u.name for u in users]
+
+        # Ambil enrollment mandatory
+        enrollments = frappe.get_all(
+            "LMS Enrollment",
+            filters={
+                "member": ["in", user_ids],
+                "course": ["in", mandatory_courses]
+            },
+            fields=["member", "course", "progress"]
+        )
+
+        # Map enrollment per user
+        enrollment_map = {}
+        for e in enrollments:
+            enrollment_map.setdefault(e.member, {})[e.course] = e.progress
+
+        compliant = 0
+        non_compliant = 0
+
+        # ===============================
+        # 5️⃣ HITUNG STATUS PER CREW
+        # ===============================
+        for user in users:
+            user_courses = enrollment_map.get(user.name, {})
+            completed = 0
+
+            for course in mandatory_courses:
+                if user_courses.get(course) == 100:
+                    completed += 1
+
+            if completed == total_mandatory:
+                compliant += 1
+            else:
+                non_compliant += 1
+
+        compliance_percentage = round(
+            (compliant / total_crew) * 100, 0
+        ) if total_crew else 0
+
+        result.append({
+            "vessel": vessel.vessel_name,
+            "total_crew": total_crew,
+            "compliant": compliant,
+            "non_compliant": non_compliant,
+            "compliance_percentage": compliance_percentage
+        })
+
+    return {
+        "vessels": result
+    }
+
+
+@frappe.whitelist()
+def get_top_non_compliant_courses(vessel=None, limit=5):
+    """
+    Top Non-Compliant Mandatory Courses
+    - Mandatory = course di LMS Program Course
+    - Jika vessel kosong → semua vessel
+    """
+
+    # -----------------------------------
+    # 1️⃣ Mandatory course list
+    # -----------------------------------
+    program_courses = frappe.get_all(
+        "LMS Program Course",
+        fields=["course", "course_title"]
+    )
+
+    mandatory_courses = list(set(pc.course for pc in program_courses))
+
+    if not mandatory_courses:
+        return []
+
+    # -----------------------------------
+    # 2️⃣ Filter vessel (optional)
+    # -----------------------------------
+    vessel_filter = ""
+    params = {"courses": mandatory_courses}
+
+    if vessel:
+        vessel_filter = "AND u.vessel = %(vessel)s"
+        params["vessel"] = vessel
+
+    # -----------------------------------
+    # 3️⃣ Query compliance
+    # -----------------------------------
+    data = frappe.db.sql(
+        f"""
+        SELECT
+            c.name AS course,
+            c.title AS course_title,
+            COUNT(e.name) AS total,
+            SUM(CASE WHEN e.progress = 100 THEN 1 ELSE 0 END) AS completed
+        FROM `tabLMS Enrollment` e
+        JOIN `tabUser` u ON u.name = e.member
+        JOIN `tabLMS Course` c ON c.name = e.course
+        WHERE
+            e.course IN %(courses)s
+            {vessel_filter}
+        GROUP BY e.course
+        """,
+        params,
+        as_dict=True
+    )
+
+    # -----------------------------------
+    # 4️⃣ Hitung compliance %
+    # -----------------------------------
+    result = []
+
+    for row in data:
+        if not row.total:
+            continue
+
+        compliance = round((row.completed / row.total) * 100)
+
+        result.append({
+            "course": row.course,
+            "course_title": row.course_title,
+            "compliance_percentage": compliance
+        })
+
+    # -----------------------------------
+    # 5️⃣ Sort paling rendah
+    # -----------------------------------
+    result.sort(key=lambda x: x["compliance_percentage"])
+
+    return result[:limit]
+
+
+@frappe.whitelist()
+def get_vessel_dropdown():
+    vessels = frappe.get_all(
+        "LMS Vessel",
+        fields=["vessel_name"],
+        order_by="vessel_name asc"
+    )
+
+    return [
+        {
+            "label": v.vessel_name,
+            "value": v.vessel_name
+        }
+        for v in vessels
+    ]
+
+
+@frappe.whitelist()
+def get_pending_non_mandatory_summary(crew_vessel):
+
+    # ===============================
+    # 1️⃣ Ambil Vessel ID
+    # ===============================
+    vessel_id = frappe.db.get_value(
+        "LMS Vessel",
+        {"vessel_name": crew_vessel},
+        "name"
+    )
+
+    if not vessel_id:
+        return {"error": "Invalid vessel", "input": crew_vessel}
+
+    # ===============================
+    # 2️⃣ Ambil CREW dari User
+    # ===============================
+    users = frappe.get_all(
+        "User",
+        filters={
+            "vessel": vessel_id,
+            "enabled": 1
+        },
+        fields=["name", "full_name"]
+    )
+
+    if not users:
+        return {
+            "vessel": crew_vessel,
+            "pending_non_mandatory": {
+                "total_courses": 0,
+                "total_enrollments": 0,
+                "per_crew": []
+            }
+        }
+
+    user_ids = [u.name for u in users]
+
+    # ===============================
+    # 3️⃣ Ambil COURSE MANDATORY
+    # ===============================
+    program_courses = frappe.get_all(
+        "LMS Program Course",
+        fields=["course"]
+    )
+
+    mandatory_courses = {pc.course for pc in program_courses}
+
+    # ===============================
+    # 4️⃣ Ambil SEMUA ENROLLMENT CREW
+    # ===============================
+    enrollments = frappe.get_all(
+        "LMS Enrollment",
+        filters={
+            "member": ["in", user_ids]
+        },
+        fields=["member", "course", "progress"]
+    )
+
+    # ===============================
+    # 5️⃣ Filter Pending Non-Mandatory
+    # ===============================
+    pending_courses = set()
+    per_crew_map = {}
+
+    for e in enrollments:
+        if (
+            e.course not in mandatory_courses and
+            (e.progress or 0) < 100
+        ):
+            pending_courses.add(e.course)
+            per_crew_map.setdefault(e.member, 0)
+            per_crew_map[e.member] += 1
+
+    # ===============================
+    # 6️⃣ Build Per Crew Summary
+    # ===============================
+    per_crew = []
+    for u in users:
+        per_crew.append({
+            "crew_name": u.full_name,
+            "pending_non_mandatory": per_crew_map.get(u.name, 0)
+        })
+
+    # ===============================
+    # 7️⃣ Final Response
+    # ===============================
+    return {
+        "vessel": crew_vessel,
+        "pending_non_mandatory": {
+            "total_courses": len(pending_courses),
+            "total_enrollments": sum(per_crew_map.values()),
+            "per_crew": per_crew
+        }
+    }
+
+
+@frappe.whitelist()
+def get_crew_training_status_table(crew_vessel):
+    today = getdate(nowdate())
+
+    # ===============================
+    # 1️⃣ Ambil LMS Vessel ID
+    # ===============================
+    vessel_id = frappe.db.get_value(
+        "LMS Vessel",
+        {"vessel_name": crew_vessel},
+        "name"
+    )
+
+    if not vessel_id:
+        return {"error": "Invalid vessel", "input": crew_vessel}
+
+    # ===============================
+    # 2️⃣ Ambil CREW dari User
+    # ===============================
+    users = frappe.get_all(
+        "User",
+        filters={
+            "vessel": vessel_id,
+            "enabled": 1
+        },
+        fields=["name", "full_name"]
+    )
+
+    if not users:
+        return {
+            "vessel": crew_vessel,
+            "summary": {
+                "total_crew": 0,
+                "compliant": 0,
+                "at_risk": 0,
+                "non_compliant": 0,
+                "overdue": 0
+            },
+            "crew_training_status": []
+        }
+
+    user_ids = [u.name for u in users]
+
+    # ===============================
+    # 3️⃣ Ambil LMS Program (MANDATORY)
+    # ===============================
+    programs = frappe.get_all(
+        "LMS Program",
+        fields=["name"]
+    )
+
+    program_names = [p.name for p in programs]
+
+    # ===============================
+    # 4️⃣ Ambil COURSE dari Program
+    # ===============================
+    program_courses = frappe.get_all(
+        "LMS Program Course",
+        filters={"parent": ["in", program_names]},
+        fields=["course"]
+    )
+
+    mandatory_courses = list(set(pc.course for pc in program_courses))
+    total_courses = len(mandatory_courses)
+
+    # ===============================
+    # 5️⃣ Ambil ENROLLMENT
+    # ===============================
+    enrollments = frappe.get_all(
+        "LMS Enrollment",
+        filters={
+            "member": ["in", user_ids],
+            "course": ["in", mandatory_courses]
+        },
+        fields=["member", "course", "progress", "due_date"]
+    )
+
+    enrollment_map = {}
+    for e in enrollments:
+        enrollment_map.setdefault(e.member, {})[e.course] = e
+
+    # ===============================
+    # 6️⃣ Hitung STATUS per CREW
+    # ===============================
+    result = []
+    summary = {
+        "total_crew": len(users),
+        "compliant": 0,
+        "at_risk": 0,
+        "non_compliant": 0,
+        "overdue": 0,
+    }
+
+    for user in users:
+        completed = 0
+        incomplete = 0
+        overdue_courses = 0
+
+        user_enrollments = enrollment_map.get(user.name, {})
+
+        for course in mandatory_courses:
+            enrollment = user_enrollments.get(course)
+
+            if enrollment and enrollment.progress == 100:
+                completed += 1
+            else:
+                incomplete += 1
+
+                if (
+                    enrollment
+                    and enrollment.due_date
+                    and getdate(enrollment.due_date) < today
+                ):
+                    overdue_courses += 1
+
+        # ===== Status Logic =====
+        if completed == total_courses:
+            status = "Compliant"
+            summary["compliant"] += 1
+        elif overdue_courses > 0:
+            status = "Non-Compliant"
+            summary["non_compliant"] += 1
+        else:
+            status = "At Risk"
+            summary["at_risk"] += 1
+
+        # ===== Summary Overdue =====
+        summary["overdue"] += overdue_courses
+
+        # ===== Alert Text =====
+        if overdue_courses > 0:
+            alerts = f"{overdue_courses} Course Overdue"
+        elif incomplete > 0:
+            alerts = f"{incomplete} Course Incomplete"
+        else:
+            alerts = "None"
+
+        result.append({
+            "crew_name": user.full_name,
+            "mandatory_percentage": round(
+                (completed / total_courses) * 100, 2
+            ) if total_courses else 0,
+            "completed_courses": completed,
+            "total_mandatory_courses": total_courses,
+            "status": status,
+            "alerts": alerts,
+            "action": "view"
+        })
+
+    return {
+        "vessel": crew_vessel,
+        "summary": summary,
+        "crew_training_status": result
+    }
 
 
 @frappe.whitelist()
