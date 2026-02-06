@@ -199,11 +199,6 @@
 			<h1 class="text-2xl font-bold text-gray-800">
 				Vessel Training Compliance - {{ crew_vessel }}
 			</h1>
-			<button
-				class="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700"
-			>
-				Generate Report
-			</button>
 		</div>
 
 		<!-- KPI Cards -->
@@ -376,13 +371,22 @@
 			</h1>
 
 			<div class="flex gap-3">
-				<select class="border rounded-lg px-4 py-2 bg-white">
-					<option>Select Vessel</option>
-					<option>Pacific Explorer</option>
-					<option>Atlantic Carrier</option>
+				<select
+					v-model="selectedVessel"
+					class="border rounded-lg px-4 py-2 bg-white"
+				>
+					<option disabled value="">Select Vessel</option>
+					<option
+						v-for="vessel in getVesselList.data || []"
+						:key="vessel.value"
+						:value="vessel.value"
+					>
+						{{ vessel.label }}
+					</option>
 				</select>
 
 				<button
+					@click="handleGenerateReport"
 					class="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700"
 				>
 					Generate Report
@@ -395,25 +399,33 @@
 			<!-- Fleet Compliance -->
 			<div class="bg-white rounded-xl p-6 border-l-4 border-blue-500 shadow">
 				<p class="text-gray-500 text-sm">Fleet Compliance</p>
-				<p class="text-3xl font-bold mt-2">82%</p>
+				<p class="text-3xl font-bold mt-2">
+					{{ fleetManagementSummary.fleet_compliance }}%
+				</p>
 			</div>
 
 			<!-- Vessels >95% -->
 			<div class="bg-white rounded-xl p-6 border-l-4 border-green-500 shadow">
 				<p class="text-gray-500 text-sm">Vessels &gt;95% Compliant</p>
-				<p class="text-3xl font-bold mt-2">12 / 15</p>
+				<p class="text-3xl font-bold mt-2">
+					{{ fleetManagementSummary.vessels_above_95 }} / {{ vessels.length }}
+				</p>
 			</div>
 
 			<!-- Total Overdue -->
 			<div class="bg-white rounded-xl p-6 border-l-4 border-orange-400 shadow">
 				<p class="text-gray-500 text-sm">Total Overdue</p>
-				<p class="text-3xl font-bold mt-2">45</p>
+				<p class="text-3xl font-bold mt-2">
+					{{ fleetManagementSummary.total_overdue }}
+				</p>
 			</div>
 
 			<!-- Avg Non Mandatory -->
 			<div class="bg-white rounded-xl p-6 border-l-4 border-blue-400 shadow">
 				<p class="text-gray-500 text-sm">Avg. Non-Mandatory / User</p>
-				<p class="text-3xl font-bold mt-2">2.4</p>
+				<p class="text-3xl font-bold mt-2">
+					{{ fleetManagementSummary.avg_non_mandatory_per_user }}
+				</p>
 			</div>
 		</div>
 
@@ -423,18 +435,28 @@
 			<div class="bg-white rounded-xl shadow p-6">
 				<h2 class="text-lg font-semibold mb-4">Top Non-Compliant Courses</h2>
 
-				<ul class="space-y-4">
-					<li class="flex justify-between">
-						<span>Environmental Regulations</span>
-						<span class="text-red-500 font-semibold">32% Compliance</span>
-					</li>
-					<li class="flex justify-between">
-						<span>Advanced Firefighting</span>
-						<span class="text-red-500 font-semibold">45% Compliance</span>
-					</li>
-					<li class="flex justify-between">
-						<span>Cyber Security</span>
-						<span class="text-orange-500 font-semibold">67% Compliance</span>
+				<!-- Empty -->
+				<div v-if="!topNonCompliantCourses.length" class="text-gray-400">
+					No courses found
+				</div>
+
+				<!-- List -->
+				<ul v-else class="space-y-4">
+					<li
+						v-for="course in topNonCompliantCourses"
+						:key="course.course"
+						class="flex justify-between items-center"
+					>
+						<span class="font-medium">
+							{{ course.course_title }}
+						</span>
+
+						<span
+							class="font-semibold"
+							:class="getComplianceColor(course.compliance_percentage)"
+						>
+							{{ course.compliance_percentage }}% Compliance
+						</span>
 					</li>
 				</ul>
 			</div>
@@ -445,27 +467,35 @@
 
 				<table class="w-full text-sm">
 					<thead>
-						<tr class="text-left bg-gray-100">
+						<tr class="bg-gray-100 text-left">
 							<th class="p-2">Vessel</th>
 							<th class="p-2">Compliance</th>
 							<th class="p-2">Status</th>
 						</tr>
 					</thead>
+
 					<tbody>
-						<tr class="border-b">
-							<td class="p-2">Pacific Explorer</td>
-							<td class="p-2">98%</td>
-							<td class="p-2 text-green-600 font-semibold">Excellent</td>
+						<tr v-for="vessel in vessels" :key="vessel.vessel" class="border-b">
+							<td class="p-2">
+								{{ vessel.vessel }}
+							</td>
+
+							<td class="p-2 font-semibold">
+								{{ vessel.compliance_percentage }}%
+							</td>
+
+							<td
+								class="p-2 font-semibold"
+								:class="statusClass(vessel.compliance_percentage)"
+							>
+								{{ getStatus(vessel.compliance_percentage) }}
+							</td>
 						</tr>
-						<tr class="border-b">
-							<td class="p-2">Atlantic Carrier</td>
-							<td class="p-2">78%</td>
-							<td class="p-2 text-orange-500 font-semibold">Needs Attention</td>
-						</tr>
-						<tr>
-							<td class="p-2">Indian Voyager</td>
-							<td class="p-2">55%</td>
-							<td class="p-2 text-red-600 font-semibold">Critical</td>
+
+						<tr v-if="!vessels.length">
+							<td colspan="3" class="p-4 text-center text-gray-400">
+								No data available
+							</td>
 						</tr>
 					</tbody>
 				</table>
@@ -599,7 +629,7 @@
 <script setup>
 import GreetingDesktopImg from '@/assets/greeting_desktop.png'
 import GreetingMobileImg from '@/assets/greeting_mobile.png'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { createResource, call, toast } from 'frappe-ui'
 import { usersStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
@@ -607,6 +637,7 @@ import { useRouter } from 'vue-router'
 const { userResource } = usersStore()
 
 const router = useRouter()
+const selectedVessel = ref('')
 
 const getRelativeDayLabel = (dateStr) => {
 	if (!dateStr) return ''
@@ -752,6 +783,98 @@ const getPendingNonMandatorySummary = createResource({
 
 const pendingNonMandatory = computed(() => {
 	return getPendingNonMandatorySummary.data?.pending_non_mandatory || ''
+})
+
+const getStatus = (percentage) => {
+	if (percentage >= 95) return 'Excellent'
+	if (percentage >= 80) return 'Good'
+	if (percentage >= 60) return 'Needs Attention'
+	return 'Critical'
+}
+
+const statusClass = (percentage) => {
+	if (percentage >= 95) return 'text-green-600'
+	if (percentage >= 80) return 'text-green-500'
+	if (percentage >= 60) return 'text-orange-500'
+	return 'text-red-600'
+}
+
+const getComplianceColor = (percentage) => {
+	if (percentage < 50) {
+		return 'text-red-500'
+	}
+	if (percentage < 80) {
+		return 'text-orange-500'
+	}
+	return 'text-green-600'
+}
+
+const topNonCompliantCourses = computed(() => {
+	return getTopNonCompliantCourses.data || { courses: [] }
+})
+
+const getFleetManagementSummary = createResource({
+	url: 'lms.lms.utils.get_fleet_management_summary',
+	auto: true,
+	onSuccess(data) {
+		console.log('Fleet Management Summary Data:', data)
+	},
+})
+
+const fleetManagementSummary = computed(() => {
+	return getFleetManagementSummary.data
+})
+
+const getTopNonCompliantCourses = createResource({
+	url: 'lms.lms.utils.get_top_non_compliant_courses',
+	auto: true,
+	makeParams() {
+		return {
+			vessel: selectedVessel.value,
+		}
+	},
+})
+
+const getVesselComparison = createResource({
+	url: 'lms.lms.utils.get_vessel_comparison',
+	auto: true,
+	onSuccess(data) {
+		console.log('Vessel Comparison Data:', data)
+	},
+})
+
+const vessels = computed(() => {
+	return getVesselComparison.data?.vessels || []
+})
+
+const handleGenerateReport = async () => {
+	if (!selectedVessel.value) {
+		toast.warning('Please select vessel first')
+		return
+	}
+
+	try {
+		console.log('Calling API with vessel:', selectedVessel.value)
+
+		const data = await call('lms.lms.utils.get_top_non_compliant_courses', {
+			vessel: selectedVessel.value,
+		})
+
+		console.log('Top Non Compliant Courses Data:', data)
+
+		topNonCompliantCourses.value = data
+	} catch (err) {
+		console.error(err)
+		toast.error(err.message || err)
+	}
+}
+
+const getVesselList = createResource({
+	url: 'lms.lms.utils.get_vessel_dropdown',
+	auto: true,
+	onSuccess(data) {
+		console.log('Vessel List Data:', data)
+	},
 })
 
 const complianceByCourse = createResource({
