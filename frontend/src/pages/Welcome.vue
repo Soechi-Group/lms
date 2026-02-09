@@ -238,7 +238,9 @@
 						:key="course.course"
 						class="flex justify-between border-b pb-2"
 					>
-						<span>{{ course.course_title }}</span>
+						<a :href="`/lms/courses/${course.course}`" target="__blank"
+							><span>{{ course.course_title }}</span></a
+						>
 						<span
 							:class="{
 								'text-red-600': course.compliance_percentage < 50,
@@ -447,9 +449,11 @@
 						:key="course.course"
 						class="flex justify-between items-center"
 					>
-						<span class="font-medium">
-							{{ course.course_title }}
-						</span>
+						<a :href="`/lms/courses/${course.course}`" target="__blank">
+							<span class="font-medium">
+								{{ course.course_title }}
+							</span>
+						</a>
 
 						<span
 							class="font-semibold"
