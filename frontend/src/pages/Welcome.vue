@@ -365,7 +365,7 @@
 		</div>
 	</div>
 
-	<div v-if="user_type === 'system user'" class="p-6 space-y-6 bg-gray-50">
+	<div v-if="is_dashboard_manager" class="p-6 space-y-6 bg-gray-50">
 		<!-- HEADER -->
 		<div class="flex justify-between items-center mb-6">
 			<h1 class="text-2xl font-bold text-gray-800">
@@ -642,6 +642,7 @@ const { userResource } = usersStore()
 
 const router = useRouter()
 const selectedVessel = ref('')
+const topNonCompliantCourses = ref([])
 
 const getRelativeDayLabel = (dateStr) => {
 	if (!dateStr) return ''
@@ -714,6 +715,10 @@ const crew_vessel = computed(() => {
 
 const user_type = computed(() => {
 	return String(userResource.data?.user_type || 'Guest').toLowerCase()
+})
+
+const is_dashboard_manager = computed(() => {
+	return userResource.data?.is_dashboard_manager || false
 })
 
 const handleEnroll = (program) => {
@@ -813,10 +818,6 @@ const getComplianceColor = (percentage) => {
 	return 'text-green-600'
 }
 
-const topNonCompliantCourses = computed(() => {
-	return getTopNonCompliantCourses.data || { courses: [] }
-})
-
 const getFleetManagementSummary = createResource({
 	url: 'lms.lms.utils.get_fleet_management_summary',
 	auto: true,
@@ -827,16 +828,6 @@ const getFleetManagementSummary = createResource({
 
 const fleetManagementSummary = computed(() => {
 	return getFleetManagementSummary.data
-})
-
-const getTopNonCompliantCourses = createResource({
-	url: 'lms.lms.utils.get_top_non_compliant_courses',
-	auto: true,
-	makeParams() {
-		return {
-			vessel: selectedVessel.value,
-		}
-	},
 })
 
 const getVesselComparison = createResource({
