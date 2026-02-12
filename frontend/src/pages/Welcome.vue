@@ -209,7 +209,7 @@
 			</div>
 
 			<div class="bg-white rounded-xl p-6 border-l-4 border-red-500 shadow">
-				<p class="text-gray-500 text-sm">Courses At Risk</p>
+				<p class="text-gray-500 text-sm">Mandatory Courses</p>
 				<p class="text-3xl font-bold mt-2">{{ courseAtRisk }}</p>
 			</div>
 
