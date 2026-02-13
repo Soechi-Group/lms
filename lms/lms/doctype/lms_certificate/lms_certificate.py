@@ -245,6 +245,7 @@ def create_certificate(course):
             "issue_date": issue_date,
             "expiry_date": expiry_date,
             "template": default_certificate_template,
+            "published": 1
         }
     )
     cert_doc.save(ignore_permissions=True)
