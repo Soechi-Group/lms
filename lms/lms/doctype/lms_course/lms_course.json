@@ -35,6 +35,7 @@
   "short_introduction",
   "column_break_viqw",
   "description",
+  "regulatory_compliance",
   "section_break_gglp",
   "chapters",
   "related_courses",
@@ -285,6 +286,11 @@
    "fieldtype": "Select",
    "label": "Certificate Validity",
    "options": "Lifetime\n1 Year\n2 Year\n3 Year"
+  },
+  {
+   "fieldname": "regulatory_compliance",
+   "fieldtype": "Text Editor",
+   "label": "Regulatory Compliance"
   }
  ],
  "is_published_field": "published",
@@ -303,7 +309,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2025-10-14 10:14:38.804666",
+ "modified": "2026-02-24 10:46:47.513078",
  "modified_by": "Administrator",
  "module": "LMS",
  "name": "LMS Course",
