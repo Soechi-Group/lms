@@ -6,6 +6,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "certificate_no",
   "member",
   "member_name",
   "evaluator",
@@ -20,7 +21,9 @@
   "course_title",
   "column_break_ywee",
   "batch_name",
-  "batch_title"
+  "batch_title",
+  "company_code",
+  "vessel_code"
  ],
  "fields": [
   {
@@ -118,11 +121,26 @@
    "fieldtype": "Data",
    "label": "Batch Title",
    "read_only": 1
+  },
+  {
+   "fieldname": "certificate_no",
+   "fieldtype": "Data",
+   "label": "Certificate No"
+  },
+  {
+   "fieldname": "company_code",
+   "fieldtype": "Data",
+   "label": "Company Code"
+  },
+  {
+   "fieldname": "vessel_code",
+   "fieldtype": "Data",
+   "label": "Vessel Code"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-19 16:26:05.902473",
+ "modified": "2026-02-25 14:05:25.372202",
  "modified_by": "Administrator",
  "module": "LMS",
  "name": "LMS Certificate",
@@ -165,6 +183,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

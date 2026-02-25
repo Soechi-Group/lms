@@ -7,7 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "vessel_code",
-  "vessel_name"
+  "vessel_name",
+  "company_group"
  ],
  "fields": [
   {
@@ -20,12 +21,19 @@
    "fieldtype": "Data",
    "label": "Vessel Name",
    "unique": 1
+  },
+  {
+   "fieldname": "company_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company Group",
+   "options": "LMS Company"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-23 09:37:53.723150",
+ "modified": "2026-02-24 13:37:27.815478",
  "modified_by": "Administrator",
  "module": "LMS",
  "name": "LMS Vessel",

@@ -180,6 +180,83 @@ def send_expiry_notifications():
     frappe.db.commit()
 
 
+def get_running_number(company_code, vessel_code):
+    """
+    Generate running number based on reset logic:
+    1. Per Vessel: Counter resets to 001 for every new vessel
+    2. Per Calendar Year: Counter resets on January 1st (entire system)
+    3. Continuous: Increments indefinitely, resets on 1st January
+
+    Args:
+        company_code: Company code for filtering
+        vessel_code: Vessel code for filtering
+
+    Returns:
+        Running number as string (e.g., "001", "002", etc.)
+    """
+    from datetime import date
+
+    current_year = date.today().year
+
+    # Get the first certificate of current year for this vessel
+    # to check if we need to reset
+    current_year_start = f"{current_year}-01-01"
+
+    # Get all certificates for this vessel from the current year
+    current_year_certs = frappe.get_all(
+        "LMS Certificate",
+        filters={
+            "company_code": company_code,
+            "vessel_code": vessel_code,
+            "creation": [">=", current_year_start]
+        },
+        fields=["certificate_no", "creation"],
+        order_by="creation desc"
+    )
+
+    # If there are certificates from the current year for this vessel
+    if current_year_certs:
+        try:
+            # Extract the running number from the latest certificate
+            latest_cert_no = current_year_certs[0].certificate_no
+            # Format: COMPANY/VESSEL/RUNNING_NUMBER/YEAR/MONTH
+            running_number_str = latest_cert_no.split("/")[2]
+            running_number = int(running_number_str)
+
+            # Return next number (padded with zeros to 3 digits)
+            return str(running_number + 1).zfill(3)
+        except (IndexError, ValueError):
+            pass
+
+    # If no certificate exists in current year for this vessel, start from 001
+    return "001"
+
+
+def generate_certificate_number(user):
+    """
+    Generate certificate number with format:
+    [COMPANY CODE] / [VESSEL CODE] / [RUNNING NUMBER] / [YEAR/MONTH]
+
+    Running number resets:
+    - To 001 for every new vessel
+    - To 001 on January 1st of each year
+    """
+    user_vessel = frappe.db.get_value("User", user, "vessel")
+    vessel_data = frappe.db.get_value(
+        "LMS Vessel", user_vessel, ["company_group", "vessel_code"])
+
+    company_code = frappe.db.get_value(
+        "LMS Company", vessel_data[0], "company_code")
+    vessel_code = vessel_data[1]
+
+    running_number = get_running_number(company_code, vessel_code)
+    year_month = getdate(nowdate()).strftime("%Y/%m")
+
+    cert_number = f"{company_code}/{vessel_code}/{running_number}/{year_month}"
+
+    return cert_number
+
+
 @frappe.whitelist()
 def create_certificate(course):
     # Cek apakah user sudah punya sertifikat untuk course ini
@@ -236,6 +313,15 @@ def create_certificate(course):
             "Print Format", {"doc_type": "LMS Certificate"}, "name"
         )
 
+    user_vessel = frappe.db.get_value("User", frappe.session.user, "vessel")
+    vessel_data = frappe.db.get_value(
+        "LMS Vessel", user_vessel, ["company_group", "vessel_code"])
+
+    company_code = frappe.db.get_value(
+        "LMS Company", vessel_data[0], "company_code")
+
+    cert_number = generate_certificate_number(frappe.session.user)
+
     # Buat dokumen certificate baru
     cert_doc = frappe.get_doc(
         {
@@ -245,7 +331,10 @@ def create_certificate(course):
             "issue_date": issue_date,
             "expiry_date": expiry_date,
             "template": default_certificate_template,
-            "published": 1
+            "published": 1,
+            "certificate_no": cert_number,
+            "vessel_code": vessel_data[1],
+            "company_code": company_code
         }
     )
     cert_doc.save(ignore_permissions=True)
