@@ -1,43 +1,32 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:vessel_name",
- "creation": "2025-12-23 09:32:20.463504",
+ "creation": "2026-02-24 13:29:34.800832",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "vessel_code",
-  "vessel_name",
-  "company_group"
+  "company_code",
+  "company_name"
  ],
  "fields": [
   {
-   "fieldname": "vessel_code",
+   "fieldname": "company_code",
    "fieldtype": "Data",
-   "label": "Vessel Code"
+   "label": "Company Code"
   },
   {
-   "fieldname": "vessel_name",
+   "fieldname": "company_name",
    "fieldtype": "Data",
-   "label": "Vessel Name",
-   "unique": 1
-  },
-  {
-   "fieldname": "company_group",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Company Group",
-   "options": "LMS Company"
+   "label": "Company Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-24 13:37:27.815478",
+ "modified": "2026-02-24 13:32:28.810861",
  "modified_by": "Administrator",
  "module": "LMS",
- "name": "LMS Vessel",
- "naming_rule": "By fieldname",
+ "name": "LMS Company",
  "owner": "Administrator",
  "permissions": [
   {
@@ -59,5 +48,5 @@
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "title_field": "vessel_name"
+ "title_field": "company_name"
 }
