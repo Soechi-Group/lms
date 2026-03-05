@@ -204,6 +204,19 @@
 							/>
 						</div>
 
+						<div class="">
+							<div class="mb-1.5 text-sm text-ink-gray-5">
+								{{ __('Regulatory Compliance') }}
+							</div>
+							<TextEditor
+								:content="course.regulatory_compliance"
+								@change="(val) => (course.regulatory_compliance = val)"
+								:editable="true"
+								:fixedMenu="true"
+								editorClass="prose-sm max-w-none border-b border-x bg-surface-gray-2 rounded-b-md py-1 px-2 min-h-[7rem]"
+							/>
+						</div>
+
 						<FormControl
 							v-model="course.video_link"
 							:label="__('Preview Video')"
@@ -381,6 +394,7 @@ const course = reactive({
 	title: '',
 	short_introduction: '',
 	description: '',
+	regulatory_compliance: '',
 	video_link: '',
 	course_image: null,
 	card_gradient: '',
