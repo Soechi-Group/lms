@@ -312,6 +312,21 @@ const addQuizzes = () => {
 	}
 }
 
+const addUserManagement = () => {
+	if (
+		(!sidebarLinks.value.find((l) => l && l.label === 'User Management') &&
+			isInstructor.value) ||
+		isModerator.value
+	) {
+		sidebarLinks.value.push({
+			label: 'User Management',
+			icon: 'Users',
+			to: 'users',
+			activeFor: ['UserManagement', 'UserForm'],
+		})
+	}
+}
+
 const addAssignments = () => {
 	if (
 		(!sidebarLinks.value.find((l) => l && l.label === 'Assignments') &&
@@ -659,6 +674,7 @@ const setupSidebarForUser = () => {
 	addPrograms()
 	addQuizzes()
 	addAssignments()
+	addUserManagement()
 	// addProgrammingExercises()
 	// setUpOnboarding()
 }
